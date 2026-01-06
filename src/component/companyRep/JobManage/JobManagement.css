@@ -1,0 +1,26 @@
+.job-management-wrapper {
+  border-radius: 14px;
+  padding: 20px;
+  box-shadow: 0 4px 18px rgba(0, 0, 0, 0.08);
+}
+
+.job-management-header {
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.job-header-buttons {
+  display: flex;
+  gap: 10px;
+}
+
+.job-search-input {
+  width: 260px;
+}
+
+.job-action-buttons {
+  display: flex;
+  gap: 8px;
+}

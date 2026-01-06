@@ -1,0 +1,76 @@
+.doc-container {
+  width: 80%;
+  margin: 40px auto;
+  background: #fff;
+  padding: 25px;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
+}
+
+.doc-title {
+  text-align: center;
+  margin-bottom: 25px;
+  font-size: 24px;
+  color: #2c3e50;
+}
+
+.doc-actions {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.doc-search {
+  width: 60%;
+  padding: 10px;
+  border: 1px solid #ccc;
+  border-radius: 8px;
+}
+
+.upload-btn {
+  background: #3498db;
+  color: white;
+  padding: 10px 15px;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.upload-btn:hover {
+  background: #217dbb;
+}
+
+.doc-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.doc-table th,
+.doc-table td {
+  padding: 12px;
+  border-bottom: 1px solid #e0e0e0;
+  text-align: left;
+}
+
+.doc-table th {
+  background: #f8f8f8;
+  font-weight: bold;
+}
+
+.delete-btn {
+  background: #e74c3c;
+  color: white;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.delete-btn:hover {
+  background: #c0392b;
+}
+
+.no-data {
+  text-align: center;
+  color: #888;
+  padding: 20px;
+}

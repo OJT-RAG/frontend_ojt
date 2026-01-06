@@ -1,0 +1,12 @@
+.admin-page.company-manager {
+}
+.admin-page.company-manager {
+	.admin-table tbody tr td:last-child {
+		white-space: nowrap;
+	}
+
+	.btn-success,
+	.btn-danger {
+		padding-inline: 1rem;
+	}
+}

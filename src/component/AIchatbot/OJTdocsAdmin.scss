@@ -1,0 +1,239 @@
+.ragdocs-page {
+  padding: 32px;
+  min-height: calc(100vh - 68px);
+  background: radial-gradient(circle at 10% 20%, rgba(99, 102, 241, 0.08), transparent 25%),
+    radial-gradient(circle at 80% 0%, rgba(59, 130, 246, 0.08), transparent 30%),
+    #f8fafc;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.ragdocs-hero {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 20px 24px;
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
+}
+
+.ragdocs-hero h1 {
+  margin: 4px 0 6px;
+  font-size: 1.6rem;
+  color: #0f172a;
+}
+
+.ragdocs-hero .sub {
+  color: #475569;
+  margin: 0;
+}
+
+.eyebrow {
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  font-size: 0.8rem;
+  color: #6366f1;
+  margin: 0;
+  font-weight: 700;
+}
+
+.status-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  color: #1f2937;
+  font-weight: 600;
+  border: 1px solid #cbd5f5;
+}
+
+.status-chip.online {
+  background: #dcfce7;
+  color: #166534;
+  border-color: #bbf7d0;
+}
+
+.status-chip.offline {
+  background: #fee2e2;
+  color: #b91c1c;
+  border-color: #fecaca;
+}
+
+.status-chip .dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.ragdocs-grid {
+  display: grid;
+  grid-template-columns: 2fr 1fr;
+  gap: 20px;
+}
+
+.card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow: 0 18px 40px rgba(15, 23, 42, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.card-header h3 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.card-header .muted {
+  margin: 4px 0 0;
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+.btn {
+  border: none;
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.2s ease;
+}
+
+.btn.primary {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #fff;
+  box-shadow: 0 10px 24px rgba(37, 99, 235, 0.25);
+}
+
+.btn.danger {
+  background: #ef4444;
+  color: #fff;
+  box-shadow: 0 10px 20px rgba(239, 68, 68, 0.22);
+}
+
+.btn.ghost {
+  background: #e2e8f0;
+  color: #1f2937;
+  box-shadow: inset 0 0 0 1px #cbd5f5;
+}
+
+.btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+.btn:not(:disabled):hover {
+  transform: translateY(-1px);
+}
+
+.alert {
+  padding: 12px 14px;
+  border-radius: 12px;
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecdd3;
+}
+
+.table-wrapper {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.table-wrapper table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.table-wrapper th,
+.table-wrapper td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #e2e8f0;
+  text-align: left;
+  vertical-align: middle;
+}
+
+.table-wrapper th {
+  background: #f8fafc;
+  color: #0f172a;
+  font-weight: 700;
+}
+
+.table-wrapper tr:last-child td {
+  border-bottom: none;
+}
+
+.code-chip {
+  background: #eef2ff;
+  padding: 6px 8px;
+  border-radius: 8px;
+  border: 1px solid #c7d2fe;
+  color: #312e81;
+  display: inline-block;
+  word-break: break-all;
+}
+
+.empty {
+  text-align: center;
+  color: #94a3b8;
+}
+
+.import-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+
+  label {
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  input {
+    padding: 12px;
+    border-radius: 10px;
+    border: 1px solid #cbd5f5;
+    font-size: 1rem;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  }
+
+  input:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.2);
+  }
+}
+
+@media (max-width: 1024px) {
+  .ragdocs-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .ragdocs-page {
+    padding: 20px;
+  }
+
+  .ragdocs-hero {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+}

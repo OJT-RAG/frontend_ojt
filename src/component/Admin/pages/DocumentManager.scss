@@ -1,0 +1,32 @@
+.admin-page.document-manager {
+  .card {
+    padding-bottom: 1.75rem;
+  }
+
+  .toolbar {
+    margin-bottom: 1rem;
+  }
+
+  .toolbar-left .btn-primary {
+    border-radius: 9999px;
+    padding-inline: 1.5rem;
+  }
+
+  .toolbar-right .chip {
+    min-width: 90px;
+    justify-content: center;
+  }
+
+  .document-list {
+    margin-top: 1.25rem;
+  }
+
+  .doc-item {
+    border-radius: 1rem;
+    border: 1px solid rgba(148, 163, 184, 0.3);
+  }
+
+  .doc-icon {
+    font-weight: 700;
+  }
+}

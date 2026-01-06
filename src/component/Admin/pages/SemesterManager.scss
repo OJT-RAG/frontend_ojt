@@ -1,0 +1,36 @@
+.admin-page.semester-manager {
+	.toolbar {
+		display: flex;
+		justify-content: flex-end;
+		margin-bottom: 1rem;
+	}
+
+	.btn-primary {
+		border-radius: 9999px;
+		padding-inline: 1.5rem;
+	}
+
+	.sm-input {
+		width: 100%;
+		padding: 0.55rem 0.75rem;
+		border-radius: 10px;
+		border: 1px solid #e2e8f0;
+		background: #fff;
+		font-size: 0.9rem;
+		color: #0f172a;
+	}
+
+	.sm-check {
+		display: inline-flex;
+		align-items: center;
+		gap: 8px;
+		font-weight: 600;
+		color: #334155;
+	}
+
+	.semester-row.editing td {
+		background: #f8fafc;
+	}
+}
+.admin-page.semester-manager {
+}

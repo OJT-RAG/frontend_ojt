@@ -1,0 +1,21 @@
+/* Basic layout helpers used by Toaster */
+.toaster {
+  /* placeholder if you wrap Toaster with a container class later */
+}
+
+/* Ensure toastViewport spacing if needed (matches toast viewport classes) */
+.toast-viewport {
+  /* keep in sync with your toast component styles */
+  padding: 1rem;
+}
+
+/* Example helpers for toast internals (override as needed) */
+.toast-title {
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.toast-description {
+  font-size: 0.875rem;
+  opacity: 0.9;
+}

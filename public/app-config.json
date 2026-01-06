@@ -1,0 +1,6 @@
+{
+  "apiBaseUrl": "http://localhost:5220",
+  "googleClientId": "324013814352-rgiflmjptchc6ml35a3s9faagr815vlf.apps.googleusercontent.com",
+  "googleRedirectUri": "http://localhost:7031/auth/google/callback",
+  "ragApiBaseUrl": "https://ojt-rag-python.onrender.com"
+}

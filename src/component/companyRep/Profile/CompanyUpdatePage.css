@@ -1,0 +1,150 @@
+/* CompanyUpdate.css */
+
+/* Container chung */
+.company-update-wrapper {
+  display: flex;
+  justify-content: center;
+  align-items: flex-start;
+  padding: 24px;
+  background: #f5f7fb;
+  min-height: 100vh;
+  box-sizing: border-box;
+}
+
+/* Card chính */
+.company-update-card {
+  width: 100%;
+  max-width: 920px;
+  margin: 12px;
+  border-radius: 12px;
+  box-shadow: 0 8px 20px rgba(23, 43, 77, 0.06);
+  background: #ffffff;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+/* Tiêu đề card (nếu không dùng AntD title prop) */
+.company-update-title {
+  font-size: 20px;
+  font-weight: 600;
+  color: #102a43;
+  margin-bottom: 12px;
+}
+
+/* Bố cục form grid */
+.form-grid-2,
+.form-grid-3 {
+  display: grid;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.form-grid-2 {
+  grid-template-columns: 1fr 1fr;
+}
+
+.form-grid-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+/* Responsive: hẹp màn hình thì xếp dọc */
+@media (max-width: 880px) {
+  .form-grid-2,
+  .form-grid-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .company-update-card {
+    padding: 16px;
+  }
+}
+
+/* Full-width inputs inside grid items */
+.ant-input,
+.ant-input-number,
+.ant-select-selector,
+.ant-select,
+.ant-picker,
+.ant-input-affix-wrapper {
+  width: 100% !important;
+  box-sizing: border-box;
+}
+
+/* Upload button style */
+.upload-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Preview logo — hiển thị nếu bạn muốn show URL trước khi upload */
+.logo-preview {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-top: 8px;
+}
+
+.logo-preview img {
+  width: 88px;
+  height: 88px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(16,42,67,0.08);
+  box-shadow: 0 4px 12px rgba(16,42,67,0.04);
+}
+
+/* Nút submit đặt ở phải màn hình trên desktop, dưới mobile full */
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 10px;
+}
+
+@media (max-width: 520px) {
+  .form-actions {
+    justify-content: stretch;
+  }
+  .form-actions .ant-btn {
+    width: 100%;
+  }
+}
+
+/* Thông báo lỗi nhỏ (nếu muốn override AntD) */
+.ant-form-item-explain-error {
+  color: #cf1322;
+  font-size: 12px;
+  margin-top: 6px;
+}
+
+/* Một số thẩm mỹ nhỏ cho label */
+.ant-form-item-label > label {
+  color: #16324f;
+  font-weight: 500;
+}
+
+/* Style switch (is_Verified) để rõ ràng */
+.ant-switch-checked {
+  background-color: #1677ff;
+}
+
+/* Card bóng nhẹ khi hover (tuỳ chọn) */
+.company-update-card:hover {
+  transform: translateY(-2px);
+  transition: transform 150ms ease;
+}
+
+/* Tùy chỉnh cho Upload list (khi hiển thị file đã chọn) */
+.ant-upload-list-item {
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: #fbfdff;
+  border: 1px solid rgba(16,42,67,0.04);
+}
+
+/* Fix overflow trên mobile */
+@media (max-width: 420px) {
+  .company-update-wrapper {
+    padding: 12px;
+  }
+}

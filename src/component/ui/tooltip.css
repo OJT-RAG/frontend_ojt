@@ -1,0 +1,38 @@
+.tooltip-content {
+  z-index: 50;
+  overflow: hidden;
+  border-radius: 0.375rem; /* 6px */
+  border: 1px solid var(--border, rgba(0,0,0,0.08));
+  background: var(--popover, #fff);
+  color: var(--popover-foreground, #111827);
+  padding: 0.375rem 0.75rem; /* 6px 12px */
+  font-size: 0.875rem; /* 14px */
+  box-shadow: 0 10px 15px -3px rgba(0,0,0,0.1);
+  animation-duration: 200ms;
+  animation-timing-function: cubic-bezier(.2,.8,.2,1);
+}
+
+/* Simple fade/slide helpers approximating the original tailwind animations */
+@keyframes fade-in {
+  from { opacity: 0; transform: translateY(-4px) scale(.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+@keyframes fade-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(-4px) scale(.98); }
+}
+
+[data-state="open"] .tooltip-content,
+.tooltip-content[data-state="open"] {
+  animation-name: fade-in;
+}
+[data-state="closed"] .tooltip-content,
+.tooltip-content[data-state="closed"] {
+  animation-name: fade-out;
+}
+
+/* Side-specific small offsets (approximate) */
+[data-side="bottom"] .tooltip-content { transform-origin: top center; }
+[data-side="top"] .tooltip-content { transform-origin: bottom center; }
+[data-side="left"] .tooltip-content { transform-origin: right center; }
+[data-side="right"] .tooltip-content { transform-origin: left center; }

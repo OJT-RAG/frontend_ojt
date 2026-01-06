@@ -1,0 +1,35 @@
+.jd-page{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:3rem 1rem;background:linear-gradient(120deg,#f8b971 0%,#df8c39 40%,#f3e9e2 100%)}
+.jd-card{width:min(1080px,100%);background:rgba(255,255,255,.78);border:2.5px solid #222;border-radius:18px;box-shadow:0 8px 32px rgba(60,60,60,.18),0 1.5px 6px rgba(141,110,99,.15);backdrop-filter:blur(8px);padding:1.5rem}
+.jd-header{display:flex;align-items:center;justify-content:space-between;gap:1rem;border-bottom:2px dashed rgba(34,34,34,.2);padding-bottom:1rem;margin-bottom:1.25rem}
+.jd-meta{display:flex;align-items:center;gap:1rem}
+.jd-logo{width:56px;height:56px;border-radius:12px;background:linear-gradient(135deg,#fff6e6 0%,#ffd9b3 100%);border:2px solid #a86a2c;display:flex;align-items:center;justify-content:center;font-weight:900;color:#a86a2c;box-shadow:0 6px 18px rgba(60,60,60,.12)}
+.jd-titles h1{margin:0;font-size:1.6rem;font-weight:900;color:#cc874b;text-shadow:0 2px 8px rgba(204,135,75,.18),0 1px 2px #222}
+.company{margin:.15rem 0 0 0;color:#222;font-weight:700}
+.jd-actions{display:flex;gap:.75rem}
+.btn{display:inline-flex;align-items:center;justify-content:center;padding:.8rem 1.1rem;border-radius:8px;font-size:1rem;font-weight:800;cursor:pointer;border:2px solid #a86a2c;box-shadow:0 2px 8px rgba(204,135,75,.1);transition:background .2s,border-color .2s,box-shadow .2s,transform .06s}
+.btn:active{transform:translateY(1px)}
+.btn.primary{background:#cc874b;color:#fff}
+.btn.primary:hover{background:#a86a2c;border-color:#cc874b;box-shadow:0 4px 16px rgba(204,135,75,.18)}
+.btn.secondary{background:#fff;color:#a86a2c}
+.btn.secondary:hover{background:#fff6e6}
+
+.jd-section{margin-bottom:1rem}
+.jd-section h3{margin:.25rem 0 .5rem 0;color:#a86a2c;font-weight:900}
+.desc{font-weight:700;color:#222}
+.chips{display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem}
+.chip{display:inline-flex;align-items:center;padding:.35rem .6rem;border-radius:999px;background:#fff;border:1px solid rgba(168,106,44,.35);color:#222;font-weight:800;font-size:.85rem}
+.chip.easy{background:#e6f7ee;color:#0f7a4b}
+.chip.medium{background:#fff7e6;color:#a86a2c}
+.chip.hard{background:#fde8e8;color:#b42318}
+
+.jd-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem;margin-bottom:1rem}
+.panel{background:#fff;border:2px solid rgba(168,106,44,.35);border-radius:12px;padding:1rem;box-shadow:0 1px 4px rgba(60,60,60,.08)}
+.panel h3{margin:.1rem 0 .6rem 0;color:#a86a2c;font-weight:900}
+.panel ul{margin:0;padding-left:1.2rem}
+.panel li{margin:.25rem 0;font-weight:700;color:#222}
+
+.levels{width:100%;border-collapse:collapse}
+.levels th,.levels td{padding:.6rem;border-bottom:1px solid rgba(34,34,34,.08);text-align:left}
+
+@media(max-width:960px){.jd-grid{grid-template-columns:1fr}}
+@media(max-width:560px){.jd-actions{flex-direction:column;align-items:stretch}.btn{width:100%}}

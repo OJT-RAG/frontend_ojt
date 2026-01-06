@@ -1,0 +1,41 @@
+.admin-page.job-manager {
+  .page-header {
+    max-width: 640px;
+  }
+
+  .filters {
+    margin-bottom: 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    gap: 1.25rem;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .filter-group {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+  }
+
+  .chip {
+    min-width: 110px;
+    justify-content: center;
+    font-size: 0.85rem;
+  }
+
+  select {
+    min-width: 180px;
+  }
+
+  @media (max-width: 900px) {
+    .filters {
+      flex-direction: column;
+      align-items: stretch;
+    }
+
+    .filter-group {
+      justify-content: space-between;
+    }
+  }
+}

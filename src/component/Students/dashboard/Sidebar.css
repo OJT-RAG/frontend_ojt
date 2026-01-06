@@ -1,0 +1,114 @@
+.sidebar {
+  width: 260px;
+  background: linear-gradient(180deg, #1a1c23 0%, #13151b 100%);
+  color: #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  border-right: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 4px 0 24px rgba(0, 0, 0, 0.2);
+  z-index: 10;
+  transition: width 0.3s ease;
+}
+
+/* Header */
+.sidebar-title {
+  padding: 2rem 1.5rem;
+  margin: 0;
+  font-size: 1.4rem;
+  font-weight: 800;
+  letter-spacing: -0.5px;
+  text-transform: uppercase;
+
+  background: linear-gradient(135deg, #fff 0%, #a0aec0 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+/* Navigation container */
+.sidebar {
+  overflow-y: auto;
+}
+
+.sidebar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.sidebar::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+/* Buttons */
+.sidebar-btn {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  background: transparent;
+  border: none;
+  color: #94a3b8;
+
+  font-size: 0.95rem;
+  font-weight: 500;
+  padding: 0.85rem 1.25rem;
+  border-radius: 12px;
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+
+  transition: all 0.25s ease;
+  overflow: hidden;
+}
+
+/* Background hover effect */
+.sidebar-btn::before {
+  content: "";
+  position: absolute;
+  left: 0;
+  top: 0;
+  height: 100%;
+  width: 0%;
+  background: linear-gradient(90deg, rgba(56, 189, 248, 0.1) 0%, transparent 100%);
+  transition: width 0.3s ease;
+  z-index: 0;
+}
+
+.sidebar-btn span,
+.sidebar-btn svg {
+  position: relative;
+  z-index: 1;
+}
+
+.sidebar-btn:hover {
+  color: #f1f5f9;
+  background: rgba(255, 255, 255, 0.03);
+  transform: translateX(4px);
+}
+
+.sidebar-btn:hover::before {
+  width: 100%;
+}
+
+.sidebar-btn.active {
+  background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%);
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+}
+
+.sidebar-btn.active:hover {
+  transform: none;
+}
+
+/* Icon zoom effect */
+.sidebar-btn svg {
+  transition: transform 0.3s ease;
+}
+
+.sidebar-btn:hover svg {
+  transform: scale(1.1);
+}

@@ -1,0 +1,46 @@
+.joblist-root{background:#fff;border:2px solid rgba(34,34,34,.06);border-radius:12px;box-shadow:0 6px 18px rgba(60,60,60,.08);padding:1rem}
+.joblist-header{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:1rem}
+.joblist-title{margin:0;font-weight:800;color:#a86a2c}
+.joblist-controls{display:flex;flex-wrap:wrap;gap:.5rem;align-items:center}
+.jl-bookmark-btn{position:relative;padding:.55rem .9rem;border:2px solid #a86a2c;border-radius:8px;background:#fff;color:#a86a2c;font-weight:800;cursor:pointer}
+.jl-bookmark-count{margin-left:.5rem;display:inline-block;min-width:1.25rem;padding:.05rem .4rem;border-radius:999px;background:#a86a2c;color:#fff;font-size:.75rem;text-align:center}
+.jl-input{padding:.6rem .75rem;border:1px solid rgba(34,34,34,.18);border-radius:8px;min-width:240px}
+.jl-select{padding:.55rem .7rem;border:1px solid rgba(34,34,34,.18);border-radius:8px;background:#fff}
+.jl-seg{display:inline-flex;border:1px solid rgba(34,34,34,.18);border-radius:8px;overflow:hidden}
+.jl-seg button{padding:.55rem .8rem;border:none;background:#fff;color:#333;cursor:pointer}
+.jl-seg button.active{background:#fff6e6;color:#a86a2c;font-weight:800}
+.jl-refresh{padding:.55rem .9rem;border:2px solid #a86a2c;border-radius:8px;background:#fff;color:#a86a2c;font-weight:800;cursor:pointer}
+.jl-actions{display:flex;gap:.4rem;align-items:center}
+.jl-save{padding:.35rem .6rem;border:1px solid rgba(168,106,44,.6);border-radius:6px;background:#fff;color:#a86a2c;font-weight:700;cursor:pointer;font-size:.75rem}
+.jl-save.saved{background:#fff0da}
+.joblist-table-wrapper{overflow:auto}
+.joblist-table{width:100%;border-collapse:collapse}
+.joblist-table th,.joblist-table td{padding:.7rem .6rem;border-bottom:1px solid rgba(34,34,34,.08);text-align:left}
+.jl-badge{display:inline-block;padding:.25rem .5rem;border-radius:999px;font-size:.85rem;font-weight:800}
+.diff-easy{background:#e6f7ee;color:#0f7a4b}
+.diff-medium{background:#fff7e6;color:#a86a2c}
+.diff-hard{background:#fde8e8;color:#b42318}
+.jl-detail{display:inline-block;padding:.4rem .75rem;border:2px solid #a86a2c;border-radius:8px;font-size:.75rem;font-weight:700;color:#a86a2c;background:#fff;text-decoration:none;transition:background .15s ease,transform .08s ease}
+.jl-detail:hover{background:#fff6e6;transform:translateY(-1px)}
+.jl-detail:active{transform:translateY(0);background:#ffe3bf}
+.jl-empty{text-align:center;color:#666}
+
+/* Bookmark Panel */
+.bookmark-panel{border:1px solid rgba(34,34,34,.12);border-radius:10px;padding:0.5rem;margin-bottom:1rem;background:#fffef9}
+.bp-header{display:flex;align-items:center;justify-content:space-between}
+.bp-close{padding:.35rem .6rem;border:1px solid rgba(34,34,34,.18);border-radius:8px;background:#fff;cursor:pointer}
+.bp-empty{padding:1rem;color:#666}
+.bp-table{width:100%;border-collapse:collapse;margin-top:.5rem}
+.bp-table th,.bp-table td{padding:.6rem;border-bottom:1px solid rgba(34,34,34,.08);text-align:left}
+.bp-actions{display:flex;gap:.4rem;align-items:center}
+.bp-unsave,.bp-detail,.bp-status-select{font-size:.8rem}
+.bp-unsave{padding:.3rem .55rem;border:1px solid #b42318;color:#b42318;background:#fff;border-radius:6px;cursor:pointer}
+.bp-detail{display:inline-block;padding:.3rem .6rem;border:1px solid #a86a2c;color:#a86a2c;background:#fff;border-radius:6px;text-decoration:none}
+.bp-status-select{padding:.3rem .35rem;border:1px solid rgba(34,34,34,.18);border-radius:6px;background:#fff}
+
+.status-badge{display:inline-block;padding:.2rem .5rem;border-radius:999px;font-weight:700;font-size:.75rem}
+.status-badge.none{background:#f2f2f2;color:#555}
+.status-badge.waiting{background:#e6f0ff;color:#1e3a8a}
+.status-badge.applied{background:#e6f7ee;color:#0f7a4b}
+
+@media(max-width:720px){.joblist-controls{width:100%}.jl-input{flex:1;min-width:0}.joblist-header{flex-direction:column;align-items:flex-start}}
