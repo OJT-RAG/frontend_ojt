@@ -41,8 +41,7 @@ body.no-scroll {
   display: flex;
   justify-content: center;
   align-items: stretch;
-  height: calc(100vh - 68px);
-  margin-top: 68px;
+  height: 100vh;
   padding: clamp(24px, 4vw, 48px);
   background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 100%);
   overflow: hidden;

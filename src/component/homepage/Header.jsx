@@ -60,10 +60,6 @@ const Header = () => {
         </div>
 
         <nav className="nav" aria-label="Main navigation">
-          <Link to='/knowledge' className={`nav-btn ${isActive('/knowledge') ? 'active' : ''}`}>
-            <BookOpen /> <span>{t("nav_knowledge")}</span>
-            <span className="line"></span>
-          </Link>
           <Link to='/qa' className={`nav-btn ${isActive('/qa') ? 'active' : ''}`}>
             <MessageSquare /> <span>{t("nav_qa")}</span>
             <span className="line"></span>
@@ -133,12 +129,6 @@ const Header = () => {
               </div>
             )}
           </div>
-
-          {/* Badge - Student / Guest */}
-          <span className="badge">
-            {role === "students" ? t('role_student') : t('role_guest')}
-          </span>
-
           {/* Login / Logout */}
           {role === "students" ? (
             <button
