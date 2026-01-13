@@ -1,6 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useI18n } from '../../i18n/i18n.jsx';
+import majorApi from '../API/MajorAPI';
+import companyApi from '../API/CompanyAPI';
+import userApi from '../API/UserAPI';
 import './SignUp.scss';
 
 function SignUp() {
@@ -35,22 +38,9 @@ function SignUp() {
     let cancelled = false;
     setMajorsError('');
     setMajorsLoading(true);
-    const endpoint = process.env.REACT_APP_MAJOR_GETALL || '/api/Major/getAll';
-    const base = (process.env.REACT_APP_API_BASE_URL || 'http://localhost:5220').replace(/\/$/, '');
-    const url = `${base}${endpoint}`;
     try {
-      const res = await fetch(url, { headers: { accept: 'application/json' } });
-      const ct = res.headers.get('content-type') || '';
-      if (!ct.includes('application/json')) {
-        const text = await res.text().catch(() => '');
-        throw new Error(`Non-JSON (${ct || 'unknown'}) @ ${url} :: ${text.slice(0,180)}`);
-      }
-      const json = await res.json();
-      if (!res.ok) {
-        const msg = json && json.message ? ` - ${json.message}` : '';
-        throw new Error(`HTTP ${res.status}${msg} @ ${url}`);
-      }
-      const list = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+      const res = await majorApi.getAll();
+      const list = Array.isArray(res?.data?.data) ? res.data.data : Array.isArray(res?.data) ? res.data : [];
       const normalized = list
         .map((m) => {
           const id = m?.majorId ?? m?.MajorId ?? m?.Major_ID ?? m?.id ?? m?.Id;
@@ -76,22 +66,9 @@ function SignUp() {
     let cancelled = false;
     setCompaniesError('');
     setCompaniesLoading(true);
-    const endpoint = process.env.REACT_APP_COMPANY_GETALL || '/api/Company/getAll';
-    const base = (process.env.REACT_APP_API_BASE_URL || 'http://localhost:5220').replace(/\/$/, '');
-    const url = `${base}${endpoint}`;
     try {
-      const res = await fetch(url, { headers: { accept: 'application/json' } });
-      const ct = res.headers.get('content-type') || '';
-      if (!ct.includes('application/json')) {
-        const text = await res.text().catch(() => '');
-        throw new Error(`Non-JSON (${ct || 'unknown'}) @ ${url} :: ${text.slice(0,180)}`);
-      }
-      const json = await res.json();
-      if (!res.ok) {
-        const msg = json && json.message ? ` - ${json.message}` : '';
-        throw new Error(`HTTP ${res.status}${msg} @ ${url}`);
-      }
-      const list = Array.isArray(json?.data) ? json.data : Array.isArray(json) ? json : [];
+      const res = await companyApi.getAll();
+      const list = Array.isArray(res?.data?.data) ? res.data.data : Array.isArray(res?.data) ? res.data : [];
       const normalized = list
         .map((c) => {
           const id = c?.company_ID ?? c?.Company_ID ?? c?.companyId ?? c?.CompanyId ?? c?.id ?? c?.Id;
@@ -143,39 +120,15 @@ function SignUp() {
         cvUrl: form.cvUrl || '',
       };
 
-      const base = (process.env.REACT_APP_API_BASE_URL || 'http://localhost:5220').replace(/\/$/, '');
-      const endpoint = process.env.REACT_APP_SIGNUP_ENDPOINT || '/api/user/create';
-      const url = `${base}${endpoint}`;
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', accept: 'application/json' },
-        body: JSON.stringify(payload),
-      });
-
-      const rawText = await res.text().catch(() => '');
-      let json = null;
-      try {
-        json = rawText ? JSON.parse(rawText) : null;
-      } catch {
-        json = null;
-      }
-
-      if (!res.ok) {
-        const serverMsg =
-          (json && (json.message || json.title || json.error)) ||
-          (typeof rawText === 'string' && rawText.trim() ? rawText.trim() : null);
-        const msg = serverMsg || `${t('signup_submit_error')} (HTTP ${res.status})`;
-        // eslint-disable-next-line no-console
-        console.error('Signup failed response:', { status: res.status, url, payload: { ...payload, password: '***' }, rawText });
-        throw new Error(msg);
-      }
-
-      alert((json && json.message) || t('signup_submit_success'));
+      const res = await userApi.create(payload);
+      const serverMsg = res?.data?.message;
+      alert(serverMsg || t('signup_submit_success'));
       navigate('/login', { replace: true });
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Signup failed:', err);
-      alert(err.message || t('signup_submit_error'));
+      const serverMsg = err?.response?.data?.message || err?.response?.data?.error;
+      alert(serverMsg || err.message || t('signup_submit_error'));
     } finally {
       setSubmitting(false);
     }

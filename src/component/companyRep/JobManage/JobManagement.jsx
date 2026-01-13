@@ -186,6 +186,7 @@ const JobManagement = () => {
   };
 
   const handleSubmitPosition = async () => {
+    let payloadForDebug = null;
     try {
       const values = await positionForm.validateFields();
 
@@ -195,6 +196,8 @@ const JobManagement = () => {
         // ensure semesterId is always included (backend requires it)
         semesterId: values.semesterId ?? activeSemester?.semesterId,
       };
+
+      payloadForDebug = payload;
 
       if (!payload.semesterId) {
         messageApi.error("Missing semesterId: please select a semester");
@@ -216,7 +219,14 @@ const JobManagement = () => {
       setEditPosition(null);
       fetchJobPositions();
     } catch (err) {
-      console.error("Job position submit error:", err);
+      console.groupCollapsed("Job position submit error");
+      console.error("Error:", err);
+      console.log("Payload:", payloadForDebug);
+      console.log("Status:", err?.response?.status);
+      console.log("Response data:", err?.response?.data);
+      console.log("Response headers:", err?.response?.headers);
+      console.log("Request:", err?.request);
+      console.groupEnd();
       messageApi.error("Failed to save job position");
     }
   };
