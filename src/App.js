@@ -16,6 +16,7 @@ import CompanyRepLayout from './component/companyRep/CompanyRepLayout';
 import AIChat from './component/Students/dashboard/ChatQA/ChatPage.jsx';
 import OJTdocsAdmin from './component/AIchatbot/OJTdocsAdmin.jsx';
 import StaffsLayout from './component/Staffs/StaffsLayout.jsx';
+import Footer from './component/homepage/Footer.jsx';
 function App() {
   return (
     <Router>
@@ -39,6 +40,7 @@ function App() {
         <Route path="/staff" element={<StaffsLayout />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
+      <Footer />
     </Router>
   );
 }
