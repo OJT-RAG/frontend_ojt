@@ -8,8 +8,17 @@ const jobPositionApi = {
   create: (data) => http.post("/job-position/create", data),
 
   // Cập nhật vị trí công việc
-  update: (id, data) =>
-    http.put(`/job-position/update/${id}`, data),
+  update: (dataOrId, maybeData) => {
+    // Swagger: PUT /api/job-position/update (no {id} in route)
+    // Back-compat: if called as update(id, data) we'll merge id into payload.
+    if (typeof dataOrId === "number") {
+      return http.put("/job-position/update", {
+        ...(maybeData || {}),
+        jobPositionId: dataOrId,
+      });
+    }
+    return http.put("/job-position/update", dataOrId);
+  },
 
   // Xóa vị trí công việc
   delete: (id) =>

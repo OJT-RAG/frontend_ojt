@@ -172,8 +172,8 @@ function Login() {
           client_id: googleClientId,
 
           callback: (response) => {
-            //console.log("=== GOOGLE RESPONSE ===", response);
-            //console.log("=== ID TOKEN ===", response?.credential);
+           //console.log("=== GOOGLE RESPONSE ===", response);
+            console.log("=== ID TOKEN ===", response?.credential);
 
             handleGoogleCredential(response?.credential);
           },
@@ -348,5 +348,5 @@ function Login() {
     </div>
   );
 }
-//console.log("CLIENT ID:", process.env.REACT_APP_GOOGLE_CLIENT_ID);
+console.log("CLIENT ID:", process.env.REACT_APP_GOOGLE_CLIENT_ID);
 export default Login;
