@@ -131,60 +131,47 @@ const Login = () => {
   };
 
   useEffect(() => {
-    if (!googleClientId) return;
+  if (!googleClientId) return;
 
-    const ensureScript = () => {
-      if (document.getElementById("google-gsi-script")) return Promise.resolve();
+  const scriptId = "google-gsi-script";
 
-      return new Promise((resolve, reject) => {
-        const script = document.createElement("script");
-        script.id = "google-gsi-script";
-        script.src = "https://accounts.google.com/gsi/client";
-        script.async = true;
-        script.defer = true;
-        script.onload = resolve;
-        script.onerror = () => reject(new Error("Failed to load Google script"));
-        document.body.appendChild(script);
+  const loadScript = () =>
+    new Promise((resolve, reject) => {
+      if (document.getElementById(scriptId)) return resolve();
+
+      const script = document.createElement("script");
+      script.id = scriptId;
+      script.src = "https://accounts.google.com/gsi/client";
+      script.async = true;
+      script.defer = true;
+      script.onload = resolve;
+      script.onerror = reject;
+      document.body.appendChild(script);
+    });
+
+  loadScript().then(() => {
+    if (!window.google?.accounts?.id) {
+      setError("Google Sign-In unavailable");
+      return;
+    }
+
+    window.google.accounts.id.initialize({
+      client_id: googleClientId,
+      callback: (res) => handleGoogleCredential(res.credential),
+    });
+
+    if (googleButtonRef.current) {
+      googleButtonRef.current.innerHTML = "";
+      window.google.accounts.id.renderButton(googleButtonRef.current, {
+        theme: "outline",
+        size: "large",
+        text: "signin_with",
+        shape: "rectangular",
       });
-    };
+    }
+  });
+}, [googleClientId]);
 
-    let cancelled = false;
-
-    ensureScript()
-      .then(() => {
-        if (cancelled) return;
-        if (!window.google?.accounts?.id) {
-          setError("Google Sign-In unavailable");
-          return;
-        }
-
-        window.google.accounts.id.initialize({
-          client_id: googleClientId,
-          callback: (res) => handleGoogleCredential(res?.credential),
-          ux_mode: "popup",
-        });
-
-        if (googleButtonRef.current) {
-          googleButtonRef.current.innerHTML = "";
-          window.google.accounts.id.renderButton(googleButtonRef.current, {
-            type: "standard",
-            theme: "outline",
-            size: "large",
-            text: "signin_with",
-            shape: "rectangular",
-          });
-        }
-
-        setGoogleReady(true);
-      })
-      .catch(() => {
-        if (!cancelled) setError("Failed to initialize Google login");
-      });
-
-    return () => {
-      cancelled = true;
-    };
-  }, [googleClientId]);
 
   const handleGoogleLogin = () => {
     if (!googleReady || !window.google?.accounts?.id) {
@@ -223,18 +210,17 @@ const Login = () => {
 
         {/* GOOGLE LOGIN */}
         <div className="social-login">
-          <div onClick={handleGoogleLogin} style={{ cursor: "pointer" }}>
-            <div ref={googleButtonRef} className="google-btn" />
-          </div>
+  <div ref={googleButtonRef} />
 
-          <button
-            type="button"
-            className="google-btn"
-            onClick={() => navigate("/signup")}
-          >
-            {t("create_account")}
-          </button>
-        </div>
+  <button
+    type="button"
+    className="google-btn"
+    onClick={() => navigate("/signup")}
+  >
+    {t("create_account")}
+  </button>
+</div>
+
 
         {error && <div className="error">{error}</div>}
         {notice && <div className="success">{notice}</div>}

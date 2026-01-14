@@ -3,16 +3,38 @@ import ChatContent from "./ChatContent";
 import ChatSessionList from "./ChatSessionList";
 import "./chat.css";
 
+/** 🔍 Lấy staff từ localStorage */
+const findStaff = () => {
+  for (let i = 0; i < localStorage.length; i++) {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(localStorage.key(i)));
+      if (parsed?.id && parsed?.role === "cro_staff") return parsed;
+    } catch {}
+  }
+  return null;
+};
+
 export default function ChatPage() {
+  const staff = findStaff();
+  const staffId = staff?.id;
+
   const [activeSession, setActiveSession] = useState(null);
+
+  if (!staffId) {
+    return <div>❌ Không xác định được staff</div>;
+  }
 
   return (
     <div className="chat-page">
-      {/* CHAT GIỮA */}
-      <ChatContent session={activeSession} />
+      <ChatContent
+        staffId={staffId}
+        session={activeSession}
+      />
 
-      {/* SESSION LIST BÊN PHẢI */}
-      <ChatSessionList onSelect={setActiveSession} />
+      <ChatSessionList
+        staffId={staffId}
+        onSelect={setActiveSession}
+      />
     </div>
   );
 }

@@ -17,6 +17,8 @@ import AIChat from './component/Students/dashboard/ChatQA/ChatPage.jsx';
 import OJTdocsAdmin from './component/AIchatbot/OJTdocsAdmin.jsx';
 import StaffsLayout from './component/Staffs/StaffsLayout.jsx';
 import Footer from './component/homepage/Footer.jsx';
+import Staffchat from './component/AIchatbot/chat/StaffChatPage.jsx';
+import ChatStaffRoom from './component/AIchatbot/chat/StaffChatRoom.jsx';
 function App() {
   return (
     <Router>
@@ -38,7 +40,9 @@ function App() {
         <Route path="/company/*" element={<CompanyRepLayout />} />
         <Route path="/qa" element={<AIChat />} />
         <Route path="/staff" element={<StaffsLayout />} />
+        <Route path="/chat/staff" element={<Staffchat />} />
         <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/chat/staff/:staffId" element={<ChatStaffRoom />} />
       </Routes>
       <Footer />
     </Router>
