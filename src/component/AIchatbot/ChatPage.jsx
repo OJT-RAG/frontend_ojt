@@ -8,6 +8,7 @@ import React, {
 import { cn } from "../lib/utils.jsx";
 import { useI18n } from "../../i18n/i18n.jsx";
 import "./ChatPage.scss";
+import { useNavigate } from "react-router-dom";
 
 const LOCAL_STORAGE_KEY = "ojt-rag-chat-sessions";
 const DEFAULT_RAG_BASE = "https://ojt-rag-python.onrender.com";
@@ -262,6 +263,7 @@ const interpretStatus = (payload) => {
 const ChatPage = () => {
   const { t } = useI18n();
   const initialSessionsRef = useRef(null);
+  const navigate = useNavigate();
 
   if (initialSessionsRef.current === null) {
     const stored = loadStoredSessions(t);
@@ -675,6 +677,11 @@ const ChatPage = () => {
             <button className="new-session-btn" onClick={handleCreateSession} type="button">
               {t("chat_new_session")}
             </button>
+            <button
+    className="staff-chat-btn"
+    type="button"
+    onClick={() => navigate("/chat/staff")}
+  >Chat with staff</button>
             <button
               className="refresh-history-btn"
               onClick={refreshHistory}

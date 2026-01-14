@@ -12,7 +12,6 @@ const Index = () => {
         
         <KnowledgeBase />
       </main>
-      <Footer />
     </div>
   );
 };
