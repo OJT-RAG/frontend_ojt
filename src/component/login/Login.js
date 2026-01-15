@@ -139,47 +139,72 @@ function Login() {
 
   // ================= GOOGLE ID SERVICES (GET idToken) =================
   useEffect(() => {
-  if (!googleClientId) return;
+    if (!googleClientId) return;
 
-  const scriptId = "google-gsi-script";
+    const ensureScript = () => {
+      if (document.getElementById("google-gsi-script"))
+        return Promise.resolve();
 
-  const loadScript = () =>
-    new Promise((resolve, reject) => {
-      if (document.getElementById(scriptId)) return resolve();
-
-      const script = document.createElement("script");
-      script.id = scriptId;
-      script.src = "https://accounts.google.com/gsi/client";
-      script.async = true;
-      script.defer = true;
-      script.onload = resolve;
-      script.onerror = reject;
-      document.body.appendChild(script);
-    });
-
-  loadScript().then(() => {
-    if (!window.google?.accounts?.id) {
-      setError("Google Sign-In unavailable");
-      return;
-    }
-
-    window.google.accounts.id.initialize({
-      client_id: googleClientId,
-      callback: (res) => handleGoogleCredential(res.credential),
-    });
-
-    if (googleButtonRef.current) {
-      googleButtonRef.current.innerHTML = "";
-      window.google.accounts.id.renderButton(googleButtonRef.current, {
-        theme: "outline",
-        size: "large",
-        text: "signin_with",
-        shape: "rectangular",
+      return new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.id = "google-gsi-script";
+        script.src = "https://accounts.google.com/gsi/client";
+        script.async = true;
+        script.defer = true;
+        script.onload = () => resolve();
+        script.onerror = () =>
+          reject(new Error("Failed to load Google script"));
+        document.body.appendChild(script);
       });
-    }
-  });
-}, [googleClientId]);
+    };
 
+    let cancelled = false;
+
+    ensureScript()
+      .then(() => {
+        if (cancelled) return;
+        if (!window.google?.accounts?.id) {
+          setError("Google Sign-In is unavailable");
+          return;
+        }
+
+        window.google.accounts.id.initialize({
+          client_id: googleClientId,
+
+          callback: (response) => {
+            //console.log("=== GOOGLE RESPONSE ===", response);
+            //console.log("=== ID TOKEN ===", response?.credential);
+
+            handleGoogleCredential(response?.credential);
+          },
+
+          ux_mode: "popup",
+          itp_support: true, // Thêm dòng này để hỗ trợ trình duyệt tốt hơn
+        });
+
+        if (googleButtonRef.current) {
+          googleButtonRef.current.innerHTML = "";
+          window.google.accounts.id.renderButton(googleButtonRef.current, {
+            type: "standard",
+            theme: "outline",
+            size: "large",
+            text: "signin_with",
+            shape: "rectangular",
+            logo_alignment: "left", // Thêm thuộc tính căn lề logo
+            width: "350", // Bạn có thể tùy chỉnh độ rộng nút
+          });
+        }
+
+        setGoogleReady(true);
+      })
+      .catch(() => {
+        if (!cancelled) setError("Failed to initialize Google login");
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [googleClientId]);
 
   // ================= LOGIN API =================
   const loginApi = async (email, password) => {
@@ -246,37 +271,37 @@ function Login() {
 
     setError("");
     // Shows the Google prompt/popup depending on browser state.
-    window.google.accounts.id.prompt((notification) => {
-      try {
-        if (notification.isNotDisplayed()) {
-          const reason = notification.getNotDisplayedReason();
-          const map = {
-            browser_not_supported: "Trình duyệt không hỗ trợ đăng nhập Google.",
-            invalid_client: "Google OAuth: clientId không hợp lệ.",
-            missing_client_id: "Thiếu Google Client ID.",
-            opt_out_or_no_session:
-              "Bạn chưa đăng nhập Google trong trình duyệt.",
-            suppressed_by_user:
-              "Đăng nhập Google bị chặn bởi người dùng/trình duyệt.",
-            unregistered_origin:
-              "Google OAuth: origin chưa được phép (Authorized JavaScript origins).",
-            secure_http_required: "Google yêu cầu HTTPS hoặc localhost hợp lệ.",
-          };
-          setError(map[reason] || `Google prompt not displayed: ${reason}`);
-        } else if (notification.isSkippedMoment()) {
-          const reason = notification.getSkippedReason();
-          setError(`Google sign-in bị bỏ qua: ${reason}`);
-        } else if (notification.isDismissedMoment()) {
-          const reason = notification.getDismissedReason();
-          // User closed the popup/one-tap; keep it quiet unless it's a hard error.
-          if (reason && reason !== "credential_returned") {
-            setError(`Google sign-in bị đóng: ${reason}`);
-          }
-        }
-      } catch (e) {
-        console.error("Google prompt notification error:", e);
-      }
-    });
+    // window.google.accounts.id.prompt((notification) => {
+    //   try {
+    //     if (notification.isNotDisplayed()) {
+    //       const reason = notification.getNotDisplayedReason();
+    //       const map = {
+    //         browser_not_supported: "Trình duyệt không hỗ trợ đăng nhập Google.",
+    //         invalid_client: "Google OAuth: clientId không hợp lệ.",
+    //         missing_client_id: "Thiếu Google Client ID.",
+    //         opt_out_or_no_session:
+    //           "Bạn chưa đăng nhập Google trong trình duyệt.",
+    //         suppressed_by_user:
+    //           "Đăng nhập Google bị chặn bởi người dùng/trình duyệt.",
+    //         unregistered_origin:
+    //           "Google OAuth: origin chưa được phép (Authorized JavaScript origins).",
+    //         secure_http_required: "Google yêu cầu HTTPS hoặc localhost hợp lệ.",
+    //       };
+    //       setError(map[reason] || `Google prompt not displayed: ${reason}`);
+    //     } else if (notification.isSkippedMoment()) {
+    //       const reason = notification.getSkippedReason();
+    //       setError(`Google sign-in bị bỏ qua: ${reason}`);
+    //     } else if (notification.isDismissedMoment()) {
+    //       const reason = notification.getDismissedReason();
+    //       // User closed the popup/one-tap; keep it quiet unless it's a hard error.
+    //       if (reason && reason !== "credential_returned") {
+    //         setError(`Google sign-in bị đóng: ${reason}`);
+    //       }
+    //     }
+    //   } catch (e) {
+    //     console.error("Google prompt notification error:", e);
+    //   }
+    // });
   };
 
   // ================= UI =================
@@ -307,17 +332,18 @@ function Login() {
         </button>
 
         <div className="social-login">
-  <div ref={googleButtonRef} />
+          <div onClick={handleGoogleLogin} style={{ cursor: "pointer" }}>
+            <div ref={googleButtonRef} />
+          </div>
 
-  <button
-    type="button"
-    className="google-btn"
-    onClick={() => navigate("/signup")}
-  >
-    {t("create_account")}
-  </button>
-</div>
-
+          <button
+            type="button"
+            className="google-btn"
+            onClick={() => navigate("/signup")}
+          >
+            {t("create_account")}
+          </button>
+        </div>
 
         {error && <div className="error">{error}</div>}
         {notice && <div className="success">{notice}</div>}
