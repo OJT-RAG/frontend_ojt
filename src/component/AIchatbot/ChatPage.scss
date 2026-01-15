@@ -195,6 +195,26 @@ html, body {
   white-space: nowrap;
 }
 
+.session-delete {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  margin-left: 10px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #ef4444;
+  cursor: pointer;
+  flex: 0 0 auto;
+}
+
+.session-delete:hover {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.18);
+}
+
 /* Main chat area */
 .chatpage-main {
   flex: 1;

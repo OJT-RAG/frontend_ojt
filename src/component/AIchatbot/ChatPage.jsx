@@ -9,6 +9,8 @@ import { cn } from "../lib/utils.jsx";
 import { useI18n } from "../../i18n/i18n.jsx";
 import "./ChatPage.scss";
 import { useNavigate } from "react-router-dom";
+import chatRoomApi from "../API/chatRoomApi.js";
+import { Trash2 } from "lucide-react";
 
 const LOCAL_STORAGE_KEY = "ojt-rag-chat-sessions";
 const DEFAULT_RAG_BASE = "https://ojt-rag-python.onrender.com";
@@ -475,6 +477,61 @@ const ChatPage = () => {
     setActiveSessionId(nextSession.id);
   };
 
+  const resolveRemoteSessionId = (session) => {
+    const raw = session?.remoteId ?? session?.id;
+    if (raw == null) return null;
+    const numeric = Number(raw);
+    if (!Number.isFinite(numeric) || numeric <= 0) return null;
+    return numeric;
+  };
+
+  const handleDeleteSession = useCallback(
+    async (session) => {
+      if (!session) return;
+
+      const confirmText =
+        (typeof t === "function" && t("chat_confirm_delete_session")) ||
+        "Delete this session?";
+
+      if (typeof window !== "undefined" && !window.confirm(confirmText)) {
+        return;
+      }
+
+      const isRemote = session.origin === "remote";
+      const remoteSessionId = resolveRemoteSessionId(session);
+
+      try {
+        if (isRemote && remoteSessionId != null) {
+          await chatRoomApi.delete(remoteSessionId);
+        }
+
+        setSessions((prev) => {
+          const remaining = prev.filter((s) => s.id !== session.id);
+          if (remaining.length === 0) {
+            const next = createLocalSession(t, 1);
+            setActiveSessionId(next.id);
+            return [next];
+          }
+
+          if (activeSessionId === session.id) {
+            setActiveSessionId(remaining[0].id);
+          }
+
+          return remaining;
+        });
+        setLastError("");
+      } catch (error) {
+        console.error("Failed to delete session", error);
+        const message =
+          error?.message
+            ? `${(typeof t === "function" && t("chat_delete_failed")) || "Delete failed"} (${error.message})`
+            : (typeof t === "function" && t("chat_delete_failed")) || "Delete failed";
+        setLastError(message);
+      }
+    },
+    [activeSessionId, t]
+  );
+
   const suggestedQuestions = useMemo(() => {
     const suggestions = t("chat_suggestions");
     if (Array.isArray(suggestions) && suggestions.length > 0) {
@@ -694,22 +751,42 @@ const ChatPage = () => {
 
           <div className="session-list">
             {sessions.map((session) => (
-              <button
+              <div
                 key={session.id}
-                type="button"
                 className={cn(
                   "session-item",
                   session.id === activeSessionId && "active",
                   session.origin === "remote" && "session-remote"
                 )}
+                role="button"
+                tabIndex={0}
                 onClick={() => {
                   setActiveSessionId(session.id);
                   setLastError("");
                 }}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter" || event.key === " ") {
+                    event.preventDefault();
+                    setActiveSessionId(session.id);
+                    setLastError("");
+                  }
+                }}
               >
                 <span className="session-title">{session.title || t("chat_session_untitled")}</span>
                 <span className="session-meta">{session.messages.length}</span>
-              </button>
+                <button
+                  type="button"
+                  className="session-delete"
+                  title={(typeof t === "function" && t("chat_delete_session")) || "Delete session"}
+                  aria-label={(typeof t === "function" && t("chat_delete_session")) || "Delete session"}
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    handleDeleteSession(session);
+                  }}
+                >
+                  <Trash2 size={14} />
+                </button>
+              </div>
             ))}
           </div>
         </aside>
