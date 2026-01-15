@@ -1,4 +1,5 @@
 import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { useAuth } from './component/Hook/useAuth.jsx';
 import Login from './component/login/Login';
 import SignUp from './component/signup/SignUp';
 import ForgotPassword from './component/forgotpassword/ForgotPassword';
@@ -19,6 +20,13 @@ import StaffsLayout from './component/Staffs/StaffsLayout.jsx';
 import Footer from './component/homepage/Footer.jsx';
 import Staffchat from './component/AIchatbot/chat/StaffChatPage.jsx';
 import ChatStaffRoom from './component/AIchatbot/chat/StaffChatRoom.jsx';
+
+function RequireAuth({ children }) {
+  const { role } = useAuth();
+  if (role === 'guest') return <Navigate to="/login" replace />;
+  return children;
+}
+
 function App() {
   return (
     <Router>
@@ -34,11 +42,11 @@ function App() {
         <Route path="/jobs" element={<JobList />} />
         <Route path="/jobs/:id" element={<JobDetail />} />
         <Route path="/ojt" element={<OJT />} />
-        <Route path="/ragdocs" element={<OJTdocsAdmin />} />
+        <Route path="/ragdocs" element={<RequireAuth><OJTdocsAdmin /></RequireAuth>} />
         <Route path="/student" element={<Student />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/company/*" element={<CompanyRepLayout />} />
-        <Route path="/qa" element={<AIChat />} />
+        <Route path="/qa" element={<RequireAuth><AIChat /></RequireAuth>} />
         <Route path="/staff" element={<StaffsLayout />} />
         <Route path="/chat/staff" element={<Staffchat />} />
         <Route path="*" element={<Navigate to="/" replace />} />

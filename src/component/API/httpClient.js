@@ -2,7 +2,7 @@
 import axios from "axios";
 
 const httpClient = axios.create({
-baseURL: "https://backend-production-8c235.up.railway.app/api",
+baseURL: "https://localhost:7031/api",
 
 });
 

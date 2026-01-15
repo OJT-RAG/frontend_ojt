@@ -13,6 +13,8 @@ const Header = () => {
   const { lang, setLang, t } = useI18n();
   const location = useLocation();
 
+  const isAuthenticated = role !== "guest";
+
   const [activeSemester, setActiveSemester] = useState(null);
   const [isLangOpen, setIsLangOpen] = useState(false);
 
@@ -45,12 +47,16 @@ const Header = () => {
         </div>
 
         <nav className="nav">
-          <Link to="/qa" className={`nav-btn ${isActive("/qa") ? "active" : ""}`}>
-            <MessageSquare /> <span>{t("nav_qa")}</span>
-          </Link>
-          <Link to="/ragdocs" className={`nav-btn ${isActive("/ragdocs") ? "active" : ""}`}>
-            <BookOpen /> <span>{t("nav_rag_docs")}</span>
-          </Link>
+          {isAuthenticated && (
+            <>
+              <Link to="/qa" className={`nav-btn ${isActive("/qa") ? "active" : ""}`}>
+                <MessageSquare /> <span>{t("nav_qa")}</span>
+              </Link>
+              <Link to="/ragdocs" className={`nav-btn ${isActive("/ragdocs") ? "active" : ""}`}>
+                <BookOpen /> <span>{t("nav_rag_docs")}</span>
+              </Link>
+            </>
+          )}
           <Link to="/ojt" className={`nav-btn ${isActive("/ojt") ? "active" : ""}`}>
             <BookOpen /> <span>{t("nav_ojt_docs")}</span>
           </Link>

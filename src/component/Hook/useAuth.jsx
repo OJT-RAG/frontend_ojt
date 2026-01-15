@@ -14,11 +14,15 @@ export const AuthProvider = ({ children }) => {
     return (localStorage.getItem("userRole") || "guest").toLowerCase();
   });
 
-  const login = (newRole, user) => {
-    setRole(newRole);
-    setAuthUser(user);
-    localStorage.setItem("userRole", newRole);
-    localStorage.setItem("authUser", JSON.stringify(user));
+  const login = (newRole, user, token) => {
+    const normalizedRole = (newRole || "guest").toLowerCase();
+    const normalizedUser = user ? { ...user, role: normalizedRole } : user;
+
+    setRole(normalizedRole);
+    setAuthUser(normalizedUser);
+    localStorage.setItem("userRole", normalizedRole);
+    localStorage.setItem("authUser", JSON.stringify(normalizedUser));
+    if (token) localStorage.setItem("token", token);
   };
 
   const logout = () => {
@@ -26,6 +30,7 @@ export const AuthProvider = ({ children }) => {
     setAuthUser(null);
     localStorage.removeItem("userRole");
     localStorage.removeItem("authUser");
+    localStorage.removeItem("token");
   };
 
   return (

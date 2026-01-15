@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useI18n } from "../../i18n/i18n.jsx";
+import { useAuth } from "../Hook/useAuth.jsx";
 import "./Login.scss";
 import userApi from "../API/UserAPI.js";
 
@@ -17,6 +18,7 @@ function Login() {
 
   const navigate = useNavigate();
   const { t } = useI18n();
+  const { login } = useAuth();
 
   const googleClientId = useMemo(() => {
     return process.env.REACT_APP_GOOGLE_CLIENT_ID || appConfig?.googleClientId;
@@ -111,11 +113,10 @@ function Login() {
 
       const res = await userApi.googleLogin({ idToken: credential });
       const { token, user } = normalizeGoogleLoginResponse(res);
-      if (token) localStorage.setItem("token", token);
 
       const jwtPayload = decodeJwtPayload(credential);
 
-      const role = user?.role || jwtPayload?.role || "student";
+      const role = String(user?.role || jwtPayload?.role || "student").toLowerCase();
 
       const authUser = {
         id: user?.userId || user?.id,
@@ -124,8 +125,7 @@ function Login() {
         role,
       };
 
-      localStorage.setItem("authUser", JSON.stringify(authUser));
-      localStorage.setItem("userRole", role);
+      login(role, authUser, token);
 
       setNotice("🎉 Đăng nhập Google thành công");
       navigate("/", { replace: true });
@@ -173,7 +173,7 @@ function Login() {
 
           callback: (response) => {
             //console.log("=== GOOGLE RESPONSE ===", response);
-            //console.log("=== ID TOKEN ===", response?.credential);
+           console.log("=== ID TOKEN ===", response?.credential);
 
             handleGoogleCredential(response?.credential);
           },
@@ -211,10 +211,15 @@ function Login() {
     try {
       const res = await userApi.login({ email, password });
 
-      if (res?.data?.data) {
+      const payload = res?.data;
+      const token = payload?.token || payload?.accessToken || payload?.jwt;
+      const user = payload?.data || payload?.user || payload?.profile;
+
+      if (user) {
         return {
           success: true,
-          user: res.data.data,
+          user,
+          token,
         };
       }
 
@@ -222,7 +227,7 @@ function Login() {
     } catch (err) {
       return {
         success: false,
-        message: err?.response?.data?.message || "Login failed",
+        message: err?.response?.data?.message || err?.message || "Login failed",
       };
     }
   };
@@ -241,7 +246,7 @@ function Login() {
       return;
     }
 
-    const apiRole = result.user.role;
+    const apiRole = String(result.user.role || "student").toLowerCase();
 
     const authUser = {
       id: result.user.userId,
@@ -250,8 +255,7 @@ function Login() {
       role: apiRole,
     };
 
-    localStorage.setItem("authUser", JSON.stringify(authUser));
-    localStorage.setItem("userRole", apiRole);
+    login(apiRole, authUser, result.token);
 
     setNotice(`🎉 Chào mừng, ${authUser.fullname}`);
     setTimeout(() => navigate("/"), 1000);
