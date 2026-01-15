@@ -15,6 +15,7 @@ const Header = () => {
   const navigate = useNavigate();
 
   const isAuthenticated = role !== "guest";
+  const canAccessRagDocs = role === "admin" || role === "cro_staff";
 
   const [activeSemester, setActiveSemester] = useState(null);
   const [isLangOpen, setIsLangOpen] = useState(false);
@@ -53,9 +54,11 @@ const Header = () => {
               <Link to="/qa" className={`nav-btn ${isActive("/qa") ? "active" : ""}`}>
                 <MessageSquare /> <span>{t("nav_qa")}</span>
               </Link>
-              <Link to="/ragdocs" className={`nav-btn ${isActive("/ragdocs") ? "active" : ""}`}>
-                <BookOpen /> <span>{t("nav_rag_docs")}</span>
-              </Link>
+              {canAccessRagDocs && (
+                <Link to="/ragdocs" className={`nav-btn ${isActive("/ragdocs") ? "active" : ""}`}>
+                  <BookOpen /> <span>{t("nav_rag_docs")}</span>
+                </Link>
+              )}
             </>
           )}
           <Link to="/ojt" className={`nav-btn ${isActive("/ojt") ? "active" : ""}`}>

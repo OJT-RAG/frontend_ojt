@@ -21,9 +21,24 @@ import Footer from './component/homepage/Footer.jsx';
 import Staffchat from './component/AIchatbot/chat/StaffChatPage.jsx';
 import ChatStaffRoom from './component/AIchatbot/chat/StaffChatRoom.jsx';
 
-function RequireAuth({ children }) {
+function RequireAuth({ children, allowedRoles }) {
   const { role } = useAuth();
-  if (role === 'guest') return <Navigate to="/login" replace />;
+  const normalizedRole = (role || 'guest').toLowerCase();
+
+  if (normalizedRole === 'guest') return <Navigate to="/login" replace />;
+
+  const normalizedAllowedRoles = Array.isArray(allowedRoles)
+    ? allowedRoles.map((r) => String(r).toLowerCase())
+    : null;
+
+  if (
+    normalizedAllowedRoles &&
+    normalizedAllowedRoles.length > 0 &&
+    !normalizedAllowedRoles.includes(normalizedRole)
+  ) {
+    return <Navigate to="/" replace />;
+  }
+
   return children;
 }
 
@@ -42,7 +57,14 @@ function App() {
         <Route path="/jobs" element={<JobList />} />
         <Route path="/jobs/:id" element={<JobDetail />} />
         <Route path="/ojt" element={<OJT />} />
-        <Route path="/ragdocs" element={<RequireAuth><OJTdocsAdmin /></RequireAuth>} />
+        <Route
+          path="/ragdocs"
+          element={
+            <RequireAuth allowedRoles={["admin", "cro_staff"]}>
+              <OJTdocsAdmin />
+            </RequireAuth>
+          }
+        />
         <Route path="/student" element={<Student />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/company/*" element={<CompanyRepLayout />} />
