@@ -10,7 +10,6 @@ import { useI18n } from "../../i18n/i18n.jsx";
 import "./ChatPage.scss";
 import { useNavigate } from "react-router-dom";
 import chatRoomApi from "../API/chatRoomApi.js";
-import { Trash2 } from "lucide-react";
 
 const LOCAL_STORAGE_KEY = "ojt-rag-chat-sessions";
 const DEFAULT_RAG_BASE = "https://ojt-rag-python.onrender.com";
@@ -750,44 +749,40 @@ const ChatPage = () => {
           </div>
 
           <div className="session-list">
-            {sessions.map((session) => (
-              <div
-                key={session.id}
-                className={cn(
-                  "session-item",
-                  session.id === activeSessionId && "active",
-                  session.origin === "remote" && "session-remote"
-                )}
-                role="button"
-                tabIndex={0}
-                onClick={() => {
-                  setActiveSessionId(session.id);
-                  setLastError("");
-                }}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter" || event.key === " ") {
-                    event.preventDefault();
-                    setActiveSessionId(session.id);
-                    setLastError("");
-                  }
-                }}
-              >
-                <span className="session-title">{session.title || t("chat_session_untitled")}</span>
-                <span className="session-meta">{session.messages.length}</span>
-                <button
-                  type="button"
-                  className="session-delete"
-                  title={(typeof t === "function" && t("chat_delete_session")) || "Delete session"}
-                  aria-label={(typeof t === "function" && t("chat_delete_session")) || "Delete session"}
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    handleDeleteSession(session);
-                  }}
-                >
-                  <Trash2 size={14} />
-                </button>
-              </div>
-            ))}
+            {sessions.map((session, index) => {
+              const displayTitle =
+                session.origin === "local"
+                  ? getSessionTitle(t, index + 1)
+                  : session.title || getSessionTitle(t, index + 1);
+
+              return (
+                <div key={session.id} className="session-row">
+                  <button
+                    type="button"
+                    className={cn(
+                      "session-item",
+                      session.id === activeSessionId && "active",
+                      session.origin === "remote" && "session-remote"
+                    )}
+                    onClick={() => {
+                      setActiveSessionId(session.id);
+                      setLastError("");
+                    }}
+                  >
+                    <span className="session-title">{displayTitle}</span>
+                    <span className="session-meta">{session.messages.length}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    className="session-delete"
+                    onClick={() => handleDeleteSession(session)}
+                  >
+                    Delete
+                  </button>
+                </div>
+              );
+            })}
           </div>
         </aside>
 
