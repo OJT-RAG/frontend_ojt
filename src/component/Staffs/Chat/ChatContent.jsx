@@ -7,6 +7,7 @@ export default function ChatContent({ staffId, session }) {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const bottomRef = useRef(null);
+  const prevCountRef = useRef(0);
 
   useEffect(() => {
     if (!session) return;
@@ -47,9 +48,12 @@ export default function ChatContent({ staffId, session }) {
     await loadConversation();
   };
 
-  useEffect(() => {
+ useEffect(() => {
+  if (messages.length > prevCountRef.current) {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [messages]);
+  }
+  prevCountRef.current = messages.length;
+}, [messages]);
 
   if (!session) {
     return (

@@ -1,3 +1,142 @@
+/* ===================== ROOT ===================== */
 .staff-chat-root {
-  padding: 24px;
+  display: flex;
+  justify-content: center;
+  align-items: stretch;
+  height: 100vh;
+  padding: clamp(24px, 4vw, 48px);
+  background: linear-gradient(135deg, #eef2ff 0%, #f8fafc 100%);
+  overflow: hidden;
+}
+
+.staff-chat-shell {
+  flex: 1;
+  max-width: 1200px;
+  width: 100%;
+  display: flex;
+  border-radius: 28px;
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.12);
+  background-color: #ffffff;
+  overflow: hidden;
+  min-height: 0;
+}
+
+/* ===================== SIDEBAR ===================== */
+.staff-chat-sidebar {
+  width: 280px;
+  border-right: 1px solid #e2e8f0;
+  display: flex;
+  flex-direction: column;
+  background-color: #f8fafc;
+  padding: 16px;
+  gap: 16px;
+  min-height: 0;
+  border-radius: 28px 0 0 28px;
+}
+
+/* ===================== HEADER ===================== */
+.staff-chat-header {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.staff-chat-header button {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: none;
+  cursor: pointer;
+  font-weight: 600;
+  font-size: 0.95rem;
+  transition: background-color 0.2s ease, transform 0.2s ease;
+  background-color: #2563eb;
+  color: #fff;
+}
+
+.staff-chat-header button:hover {
+  background-color: #1d4ed8;
+  transform: translateY(-1px);
+}
+
+/* ===================== MAIN ===================== */
+.staff-chat-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  background: linear-gradient(180deg, #ffffff 0%, #f8fafc 100%);
+  min-height: 0;
+  border-radius: 0 28px 28px 0;
+  padding: 16px 32px;
+  overflow-y: auto;
+}
+
+/* ===================== STAFF LIST ===================== */
+.staff-list {
+  flex: 1;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding-right: 4px;
+}
+
+/* ===================== STAFF ITEM ===================== */
+.staff-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  background-color: #fff;
+  cursor: pointer;
+  font-size: 0.95rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+  text-align: left;
+
+  strong {
+    font-weight: 600;
+    color: #1f2937;
+  }
+
+  span {
+    font-size: 0.8rem;
+    color: #64748b;
+    margin-left: 12px;
+    white-space: nowrap;
+  }
+
+  &:hover {
+    border-color: #bfdbfe;
+    box-shadow: 0 4px 12px rgba(37, 99, 235, 0.08);
+  }
+}
+
+@media (max-width: 1024px) {
+  .staff-chat-root {
+    padding: 20px;
+  }
+
+  .staff-chat-shell {
+    flex-direction: column;
+  }
+
+  .staff-chat-sidebar {
+    width: 100%;
+    border-right: none;
+    border-bottom: 1px solid #e2e8f0;
+    border-radius: 28px 28px 0 0;
+  }
+
+  .staff-chat-main {
+    border-radius: 0 0 28px 28px;
+  }
+}
+
+@media (max-width: 768px) {
+  .staff-chat-root {
+    padding: 16px;
+  }
 }
