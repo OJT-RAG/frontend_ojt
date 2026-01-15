@@ -1,0 +1,27 @@
+.student-jobs-root {
+  width: 100%;
+}
+
+.student-jobs-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.student-jobs-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+
+.student-jobs-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.student-jobs-search {
+  width: min(520px, 60vw);
+}

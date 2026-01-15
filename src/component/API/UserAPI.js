@@ -14,6 +14,16 @@ const userApi = {
   // Not listed in the provided spec, but used by existing UI.
   update: (data) => httpClient.put("/user/update", data),
 
+  // Student apply a job position (stores JobPositionId/SemesterId on the user).
+  // Uses the same update endpoint the app already relies on.
+  applyJobPosition: ({ userId, jobPositionId, semesterId }) => {
+    const fd = new FormData();
+    fd.append("UserId", String(userId ?? ""));
+    fd.append("JobPositionId", String(jobPositionId ?? ""));
+    if (semesterId != null) fd.append("SemesterId", String(semesterId));
+    return httpClient.put("/user/update", fd);
+  },
+
   // Not listed in the provided spec, but kept for compatibility.
   create: (data) => httpClient.post("/user/create", data),
 

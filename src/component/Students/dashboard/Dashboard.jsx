@@ -3,7 +3,7 @@ import Sidebar from "./Sidebar.jsx";
 import PdfManager from "../../pages/pdf/pdfManager.jsx";
 import FinalReportPage from "../StudentsReport/FinalReportPage.jsx";
 import UpdateUserPage from "../userProfile/UpdateUserPage.jsx";
-import JobsPage from "../../profile/Joblist.jsx"
+import StudentJobsPage from "../jobs/StudentJobsPage.jsx";
 import "./Dashboard.css";
 
 const Dashboard = () => {
@@ -20,7 +20,7 @@ const Dashboard = () => {
       case "updateuser":
         return <UpdateUserPage />;
       case "jobs":
-        return <div><JobsPage/></div>; 
+        return <StudentJobsPage />;
       case "settings":
         return <div>Nội dung Cài đặt sẽ ở đây...</div>; 
       default:
