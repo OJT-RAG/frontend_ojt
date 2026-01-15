@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { Table, Input, Button, Card, Modal, Form, InputNumber, Popconfirm, Select, Switch, Tabs, Tag, message } from "antd";
 import { RefreshCcw, Search, Plus, Pencil, Trash2, FileText } from "lucide-react";
 import jobApi from "../../API/JobAPI";
@@ -116,11 +116,22 @@ const JobManagement = () => {
   }, []);
 
   const handleSearch = (value) => {
+    const keyword = (value || "").toLowerCase();
     const result = jobs.filter((job) =>
-      job.jobTitle.toLowerCase().includes(value.toLowerCase())
+      (job.jobTitle || "").toLowerCase().includes(keyword)
     );
     setFiltered(result);
   };
+
+  const positionCountByJobTitle = useMemo(() => {
+    const map = {};
+    for (const jp of jobPositions) {
+      const title = (jp?.jobTitle || "").trim();
+      if (!title) continue;
+      map[title] = (map[title] || 0) + 1;
+    }
+    return map;
+  }, [jobPositions]);
 
   const handleSearchPositions = (value) => {
     const keyword = (value || "").toLowerCase();
@@ -176,10 +187,12 @@ const JobManagement = () => {
 
   const openEditPositionModal = (record) => {
     setEditPosition(record);
+    const matchedJobTitle = jobs.find((j) => j.jobTitle === record.jobTitle);
     const normalized = {
       ...record,
       majorId: record.majorId ?? record.major?.majorId,
       semesterId: record.semesterId ?? record.semester?.semesterId,
+      jobTitleId: matchedJobTitle?.jobTitleId,
     };
     positionForm.setFieldsValue(normalized);
     setIsPositionModalOpen(true);
@@ -190,12 +203,23 @@ const JobManagement = () => {
     try {
       const values = await positionForm.validateFields();
 
+      const selectedJob = jobs.find((j) => j.jobTitleId === values.jobTitleId);
+      if (!selectedJob) {
+        messageApi.error("Please select a valid job title");
+        return;
+      }
+
       const activeSemester = semesters.find((s) => s.isActive === true) || semesters[0];
       const payload = {
         ...values,
         // ensure semesterId is always included (backend requires it)
         semesterId: values.semesterId ?? activeSemester?.semesterId,
+        // backend expects jobTitle string; enforce selecting from job title list
+        jobTitle: selectedJob.jobTitle,
       };
+
+      // Do not send jobTitleId unless backend explicitly needs it
+      delete payload.jobTitleId;
 
       payloadForDebug = payload;
 
@@ -313,7 +337,15 @@ const JobManagement = () => {
   const columns = [
     { title: "ID", dataIndex: "jobTitleId", key: "id", width: 80 },
     { title: "Job Title", dataIndex: "jobTitle", key: "title" },
-    { title: "Positions", dataIndex: "positionAmount", key: "amount", width: 150 },
+    {
+      title: "Positions",
+      key: "amount",
+      width: 150,
+      render: (_, record) => {
+        const title = (record?.jobTitle || "").trim();
+        return positionCountByJobTitle[title] ?? record?.positionAmount ?? 0;
+      },
+    },
     {
       title: "Actions",
       key: "actions",
@@ -587,10 +619,18 @@ const JobManagement = () => {
 
           <Form.Item
             label="Job Title"
-            name="jobTitle"
-            rules={[{ required: true, message: "Please enter job title" }]}
+            name="jobTitleId"
+            rules={[{ required: true, message: "Please select a job title" }]}
           >
-            <Input />
+            <Select
+              placeholder="Select job title"
+              showSearch
+              optionFilterProp="label"
+              options={jobs.map((j) => ({
+                label: `${j.jobTitle} (ID: ${j.jobTitleId})`,
+                value: j.jobTitleId,
+              }))}
+            />
           </Form.Item>
 
           <Form.Item

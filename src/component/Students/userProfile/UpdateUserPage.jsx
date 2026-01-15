@@ -45,12 +45,20 @@ const UpdateUserPage = ({ userId = 0 }) => {
   const onFinish = async (values) => {
     setLoading(true);
     try {
-      const payload = {
-        ...values,
-        dob: values.dob ? values.dob.format("YYYY-MM-DD") : null,
-      };
+      const fd = new FormData();
+      const userIdValue = values.userId ?? resolvedUserId;
+      fd.append('UserId', String(userIdValue || ''));
+      fd.append('StudentCode', values.studentCode ?? '');
+      fd.append('Phone', values.phone ?? '');
+      fd.append('MajorId', values.majorId ?? '');
+      fd.append('AvatarUrl', values.avatarUrl ?? '');
+      fd.append('Dob', values.dob ? values.dob.format('YYYY-MM-DD') : '');
+      fd.append('CompanyId', values.companyId ?? '');
+      fd.append('Fullname', values.fullname ?? '');
+      fd.append('Password', values.password ?? '');
+      fd.append('CvUrl', values.cvUrl ?? '');
 
-      await userApi.update(payload); // gọi api từ userApi
+      await userApi.update(fd);
       message.success("User updated successfully!");
     } catch (error) {
       console.error(error);

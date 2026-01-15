@@ -9,6 +9,21 @@ const UserManager = () => {
   const [users, setUsers] = useState([]);
   const [majors, setMajors] = useState([]);
 
+  const [editingUser, setEditingUser] = useState(null);
+  const [editSaving, setEditSaving] = useState(false);
+  const [editForm, setEditForm] = useState({
+    fullname: '',
+    studentCode: '',
+    dob: '',
+    phone: '',
+    majorId: '',
+    companyId: '',
+    password: '',
+    avatarFile: null,
+    cvFile: null,
+  });
+  const [editInitial, setEditInitial] = useState(null);
+
   const [query, setQuery] = useState('');
   const [majorFilter, setMajorFilter] = useState('');
 
@@ -45,6 +60,16 @@ const UserManager = () => {
       cancelled = true;
     };
   }, []);
+
+  const refreshUsers = async () => {
+    try {
+      const res = await userApi.getAll();
+      const userList = res?.data?.data || [];
+      setUsers(Array.isArray(userList) ? userList : []);
+    } catch (e) {
+      window.alert(e?.response?.data?.message || e?.message || 'Failed to refresh users');
+    }
+  };
 
   const majorOptions = useMemo(() => {
     return majors
@@ -129,6 +154,97 @@ const UserManager = () => {
       setUsers((prev) => prev.filter((u) => u?.userId !== userId));
     } catch (e) {
       window.alert(e?.response?.data?.message || e?.message || 'Delete failed');
+    }
+  };
+
+  const openEdit = (u) => {
+    setEditingUser(u);
+    const initial = {
+      fullname: u?.fullname ?? '',
+      studentCode: u?.studentCode ?? '',
+      dob: u?.dob ? String(u.dob).slice(0, 10) : '',
+      phone: u?.phone ?? '',
+      majorId: u?.majorId != null ? String(u.majorId) : '',
+      companyId: u?.companyId != null ? String(u.companyId) : '',
+    };
+    setEditInitial(initial);
+    setEditForm({
+      ...initial,
+      password: '',
+      avatarFile: null,
+      cvFile: null,
+    });
+  };
+
+  const closeEdit = () => {
+    if (editSaving) return;
+    setEditingUser(null);
+    setEditInitial(null);
+    setEditForm({
+      fullname: '',
+      studentCode: '',
+      dob: '',
+      phone: '',
+      majorId: '',
+      companyId: '',
+      password: '',
+      avatarFile: null,
+      cvFile: null,
+    });
+  };
+
+  const setField = (key, value) => {
+    setEditForm((prev) => ({ ...prev, [key]: value }));
+  };
+
+  const handleUpdate = async (e) => {
+    e.preventDefault();
+    if (!editingUser?.userId) return;
+
+    if (!editForm.fullname?.trim()) {
+      window.alert('Full name is required');
+      return;
+    }
+
+    const fd = new FormData();
+    fd.append('UserId', String(editingUser.userId));
+
+    const appendIfChanged = (fieldName, value, initialValue) => {
+      if (!editInitial) {
+        fd.append(fieldName, value ?? '');
+        return;
+      }
+      if ((value ?? '') !== (initialValue ?? '')) {
+        fd.append(fieldName, value ?? '');
+      }
+    };
+
+    appendIfChanged('Fullname', editForm.fullname, editInitial?.fullname);
+    appendIfChanged('StudentCode', editForm.studentCode, editInitial?.studentCode);
+    appendIfChanged('Dob', editForm.dob, editInitial?.dob);
+    appendIfChanged('Phone', editForm.phone, editInitial?.phone);
+    appendIfChanged('MajorId', editForm.majorId, editInitial?.majorId);
+    appendIfChanged('CompanyId', editForm.companyId, editInitial?.companyId);
+
+    if (editForm.password?.trim()) {
+      fd.append('Password', editForm.password);
+    }
+    if (editForm.avatarFile instanceof File) {
+      fd.append('AvatarUrl', editForm.avatarFile);
+    }
+    if (editForm.cvFile instanceof File) {
+      fd.append('CvUrl', editForm.cvFile);
+    }
+
+    setEditSaving(true);
+    try {
+      await userApi.update(fd);
+      await refreshUsers();
+      closeEdit();
+    } catch (err) {
+      window.alert(err?.response?.data?.message || err?.message || 'Update failed');
+    } finally {
+      setEditSaving(false);
     }
   };
 
@@ -249,13 +365,18 @@ const UserManager = () => {
                       )}
                     </td>
                     <td>
-                      <button
-                        className="btn-danger"
-                        type="button"
-                        onClick={() => handleDelete(u.userId)}
-                      >
-                        Delete
-                      </button>
+                      <div className="actions">
+                        <button className="btn-secondary" type="button" onClick={() => openEdit(u)}>
+                          Edit
+                        </button>
+                        <button
+                          className="btn-danger"
+                          type="button"
+                          onClick={() => handleDelete(u.userId)}
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
@@ -263,6 +384,82 @@ const UserManager = () => {
             )}
           </tbody>
         </table>
+
+        {editingUser && (
+          <div className="modal-backdrop" role="dialog" aria-modal="true">
+            <div className="modal">
+              <div className="modal-header">
+                <h3>Edit User</h3>
+                <button className="modal-close" type="button" onClick={closeEdit} aria-label="Close" disabled={editSaving}>
+                  ×
+                </button>
+              </div>
+
+              <form className="modal-body" onSubmit={handleUpdate}>
+                <div className="form-grid">
+                  <label>
+                    Full name
+                    <input value={editForm.fullname} onChange={(e) => setField('fullname', e.target.value)} />
+                  </label>
+
+                  <label>
+                    Student code
+                    <input value={editForm.studentCode} onChange={(e) => setField('studentCode', e.target.value)} />
+                  </label>
+
+                  <label>
+                    DOB
+                    <input type="date" value={editForm.dob} onChange={(e) => setField('dob', e.target.value)} />
+                  </label>
+
+                  <label>
+                    Phone
+                    <input value={editForm.phone} onChange={(e) => setField('phone', e.target.value)} />
+                  </label>
+
+                  <label>
+                    Major
+                    <select value={editForm.majorId} onChange={(e) => setField('majorId', e.target.value)}>
+                      <option value="">(no major)</option>
+                      {majorOptions.map((m) => (
+                        <option key={m.id} value={m.id}>{m.name}</option>
+                      ))}
+                    </select>
+                  </label>
+
+                  <label>
+                    Company ID
+                    <input type="number" value={editForm.companyId} onChange={(e) => setField('companyId', e.target.value)} />
+                  </label>
+
+                  <label>
+                    New password
+                    <input type="password" value={editForm.password} onChange={(e) => setField('password', e.target.value)} placeholder="Leave blank to keep" />
+                  </label>
+
+                  <label>
+                    Avatar file
+                    <input type="file" accept="image/*" onChange={(e) => setField('avatarFile', e.target.files?.[0] || null)} />
+                  </label>
+
+                  <label>
+                    CV file
+                    <input type="file" accept="application/pdf,.pdf" onChange={(e) => setField('cvFile', e.target.files?.[0] || null)} />
+                  </label>
+                </div>
+
+                <div className="modal-actions">
+                  <button className="btn-secondary" type="button" onClick={closeEdit} disabled={editSaving}>
+                    Cancel
+                  </button>
+                  <button className="btn-primary" type="submit" disabled={editSaving}>
+                    {editSaving ? 'Saving...' : 'Save'}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );
