@@ -17,6 +17,10 @@ const JobManagement = () => {
   const [filteredPositions, setFilteredPositions] = useState([]);
   const [positionsLoading, setPositionsLoading] = useState(false);
 
+  const [jobDescriptions, setJobDescriptions] = useState([]);
+  const [filteredDescriptions, setFilteredDescriptions] = useState([]);
+  const [descriptionsLoading, setDescriptionsLoading] = useState(false);
+
   const [majors, setMajors] = useState([]);
   const [semesters, setSemesters] = useState([]);
 
@@ -70,8 +74,12 @@ const JobManagement = () => {
 
   const fetchDescriptions = async () => {
     try {
+      setDescriptionsLoading(true);
       const res = await jobDescriptionApi.getAll();
       const list = res.data?.data || [];
+
+      setJobDescriptions(list);
+      setFilteredDescriptions(list);
 
       const map = {};
       for (const item of list) {
@@ -84,6 +92,8 @@ const JobManagement = () => {
     } catch (err) {
       // Not fatal; table can still show job titles
       console.error("Failed to fetch job descriptions:", err);
+    } finally {
+      setDescriptionsLoading(false);
     }
   };
 
@@ -139,6 +149,27 @@ const JobManagement = () => {
       (jp.jobTitle || "").toLowerCase().includes(keyword)
     );
     setFilteredPositions(result);
+  };
+
+  const jobTitleByPositionId = useMemo(() => {
+    const map = {};
+    for (const jp of jobPositions) {
+      const id = jp?.jobPositionId ?? jp?.jobPositionID ?? jp?.jobPositionid;
+      if (id == null) continue;
+      map[id] = jp?.jobTitle || "-";
+    }
+    return map;
+  }, [jobPositions]);
+
+  const handleSearchDescriptions = (value) => {
+    const keyword = (value || "").toLowerCase();
+    const result = jobDescriptions.filter((d) => {
+      const jobPositionId = d?.jobPositionId ?? d?.jobPositionID ?? d?.jobPositionid;
+      const title = (jobTitleByPositionId[jobPositionId] || "").toLowerCase();
+      const text = (d?.jobDescription ?? d?.description ?? d?.jobDesc ?? "").toLowerCase();
+      return title.includes(keyword) || text.includes(keyword);
+    });
+    setFilteredDescriptions(result);
   };
 
   // -------------------------
@@ -289,10 +320,44 @@ const JobManagement = () => {
     if (existingFromMap) setDescExistingRecord(existingFromMap);
   };
 
+  const openCreateDescriptionModal = () => {
+    setIsDescModalOpen(true);
+    setDescEditJob(null);
+    setDescExistingRecord(null);
+    descForm.resetFields();
+  };
+
+  const openEditDescriptionModal = (record) => {
+    const jobPositionId = record?.jobPositionId ?? record?.jobPositionID ?? record?.jobPositionid;
+    const text = record?.jobDescription ?? record?.description ?? record?.jobDesc ?? record?._text ?? "";
+    setIsDescModalOpen(true);
+    setDescEditJob({ jobTitle: jobTitleByPositionId[jobPositionId] || "-" });
+    setDescExistingRecord(record);
+    descForm.resetFields();
+    descForm.setFieldsValue({
+      jobPositionId,
+      jobDescription: text,
+      hireQuantity: record?.hireQuantity ?? 0,
+      appliedQuantity: record?.appliedQuantity ?? 0,
+    });
+  };
+
   const handleSubmitDescription = async () => {
     try {
       setDescLoading(true);
       const values = await descForm.validateFields();
+      const existingRecord =
+        descExistingRecord || descriptionsByJobPositionId[values.jobPositionId] || null;
+
+      const existingId =
+        existingRecord?.jobDescriptionId ??
+        existingRecord?.jobDescriptionID ??
+        existingRecord?.jobDescriptionid ??
+        existingRecord?.jobDescId ??
+        existingRecord?.jobDescID ??
+        existingRecord?.id ??
+        existingRecord?.Id;
+
       const payload = {
         jobPositionId: values.jobPositionId,
         jobDescription: values.jobDescription,
@@ -300,11 +365,7 @@ const JobManagement = () => {
         appliedQuantity: values.appliedQuantity,
       };
 
-      const existingId =
-        descExistingRecord?.jobDescriptionId ??
-        descExistingRecord?.id ??
-        descExistingRecord?.jobDescId;
-
+      // Backend behavior: update requires existing record; otherwise it returns 404.
       if (existingId != null) {
         await jobDescriptionApi.update({ ...payload, jobDescriptionId: existingId });
         messageApi.success("Job description updated");
@@ -322,6 +383,29 @@ const JobManagement = () => {
       messageApi.error("Failed to save job description");
     } finally {
       setDescLoading(false);
+    }
+  };
+
+  const handleDeleteDescription = async (record) => {
+    try {
+      const id =
+        record?.jobDescriptionId ??
+        record?.jobDescriptionID ??
+        record?.jobDescriptionid ??
+        record?.id ??
+        record?.Id;
+
+      if (id == null) {
+        messageApi.error("Missing jobDescriptionId");
+        return;
+      }
+
+      await jobDescriptionApi.delete(id);
+      messageApi.success("Job description deleted");
+      fetchDescriptions();
+    } catch (err) {
+      console.error("Delete job description failed:", err);
+      messageApi.error("Failed to delete job description");
     }
   };
 
@@ -458,6 +542,69 @@ const JobManagement = () => {
     },
   ];
 
+  const descriptionColumns = [
+    {
+      title: "ID",
+      key: "jobDescriptionId",
+      width: 80,
+      render: (_, record) =>
+        record?.jobDescriptionId ?? record?.jobDescriptionID ?? record?.jobDescriptionid ?? record?.id ?? record?.Id,
+    },
+    {
+      title: "Job Title",
+      key: "jobTitle",
+      render: (_, record) => {
+        const jobPositionId = record?.jobPositionId ?? record?.jobPositionID ?? record?.jobPositionid;
+        return jobTitleByPositionId[jobPositionId] || "-";
+      },
+    },
+    {
+      title: "Job Position ID",
+      key: "jobPositionId",
+      width: 140,
+      render: (_, record) => record?.jobPositionId ?? record?.jobPositionID ?? record?.jobPositionid,
+    },
+    { title: "Hire Qty", dataIndex: "hireQuantity", key: "hireQuantity", width: 110 },
+    { title: "Applied Qty", dataIndex: "appliedQuantity", key: "appliedQuantity", width: 120 },
+    {
+      title: "Description",
+      key: "jobDescription",
+      render: (_, record) => {
+        const text = record?.jobDescription ?? record?.description ?? record?.jobDesc ?? "";
+        if (!text) return <span style={{ color: "#999" }}>—</span>;
+        return <span title={text}>{text.length > 80 ? `${text.slice(0, 80)}…` : text}</span>;
+      },
+    },
+    {
+      title: "Actions",
+      key: "actions",
+      width: 220,
+      render: (_, record) => (
+        <div className="job-action-buttons">
+          <Button
+            type="primary"
+            size="small"
+            onClick={() => openEditDescriptionModal(record)}
+            icon={<Pencil size={14} />}
+          >
+            Update
+          </Button>
+          <Popconfirm
+            title="Delete job description?"
+            description="Are you sure you want to delete this job description?"
+            okText="Yes"
+            cancelText="No"
+            onConfirm={() => handleDeleteDescription(record)}
+          >
+            <Button danger size="small" icon={<Trash2 size={14} />}>
+              Delete
+            </Button>
+          </Popconfirm>
+        </div>
+      ),
+    },
+  ];
+
   return (
     <>
       {contextHolder}
@@ -549,6 +696,52 @@ const JobManagement = () => {
                     rowKey="jobTitleId"
                     loading={loading}
                     pagination={{ pageSize: 10 }}
+                  />
+                </>
+              ),
+            },
+            {
+              key: "descriptions",
+              label: "Job Descriptions",
+              children: (
+                <>
+                  <div className="job-management-header">
+                    <Input
+                      placeholder="Search job description..."
+                      prefix={<Search size={16} />}
+                      className="job-search-input"
+                      onChange={(e) => handleSearchDescriptions(e.target.value)}
+                    />
+
+                    <div className="job-header-buttons">
+                      <Button
+                        className="job-create-btn"
+                        type="primary"
+                        icon={<Plus size={16} />}
+                        onClick={openCreateDescriptionModal}
+                      >
+                        Create
+                      </Button>
+
+                      <Button
+                        className="job-refresh-btn"
+                        icon={<RefreshCcw size={16} />}
+                        onClick={refreshAll}
+                      >
+                        Refresh
+                      </Button>
+                    </div>
+                  </div>
+
+                  <Table
+                    columns={descriptionColumns}
+                    dataSource={filteredDescriptions}
+                    rowKey={(r) =>
+                      r?.jobDescriptionId ?? r?.jobDescriptionID ?? r?.jobDescriptionid ?? r?.id ?? r?.Id
+                    }
+                    loading={descriptionsLoading}
+                    pagination={{ pageSize: 10 }}
+                    scroll={{ x: true }}
                   />
                 </>
               ),
