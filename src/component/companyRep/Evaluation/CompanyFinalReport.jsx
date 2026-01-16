@@ -28,6 +28,13 @@ export default function CompanyCreateFinalReport() {
   const [jobPositions, setJobPositions] = useState([]);
   const [activeSemester, setActiveSemester] = useState(null);
 
+  const isStudentUser = (u) => {
+    if (!u) return false;
+    if (u.roleId != null && Number(u.roleId) === 3) return true;
+    const roleText = String(u.role ?? u.roleName ?? "").toLowerCase();
+    return roleText === "student";
+  };
+
   // ===================== LOAD DATA =====================
   const fetchData = async () => {
     setLoading(true);
@@ -40,9 +47,7 @@ export default function CompanyCreateFinalReport() {
 
       /* ================= STUDENT (roleId = 3) ================= */
       const allUsers = userRes.data.data || [];
-      const studentOnly = allUsers.filter(
-        (u) => u.userId === 3
-      );
+      const studentOnly = allUsers.filter(isStudentUser);
       setStudents(studentOnly);
 
       /* ================= JOB POSITION ================= */

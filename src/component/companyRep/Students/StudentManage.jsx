@@ -10,6 +10,13 @@ export default function StudentManage() {
   const [selectedMajor, setSelectedMajor] = useState("");
   const [loading, setLoading] = useState(true);
 
+  const isStudentUser = (u) => {
+    if (!u) return false;
+    if (u.roleId != null && Number(u.roleId) === 3) return true;
+    const roleText = String(u.role ?? u.roleName ?? "").toLowerCase();
+    return roleText === "student";
+  };
+
   useEffect(() => {
     const loadData = async () => {
       try {
@@ -19,7 +26,10 @@ export default function StudentManage() {
         ]);
 
         // API trả về { succeeded, data } nên lấy data
-        setStudents(userRes.data.data || []);
+        const users = Array.isArray(userRes?.data)
+          ? userRes.data
+          : userRes?.data?.data || [];
+        setStudents(users.filter(isStudentUser));
         setMajors(majorRes.data.data || []);
       } catch (error) {
         console.error("Error loading data:", error);
@@ -35,7 +45,7 @@ export default function StudentManage() {
 
   // Lọc theo tên và ngành
   const filteredStudents = students.filter((stu) => {
-    const matchName = stu.fullname
+    const matchName = String(stu.fullname ?? "")
       .toLowerCase()
       .includes(searchName.toLowerCase());
     const matchMajor =
