@@ -48,9 +48,13 @@ const Header = () => {
           <Link to="/qa" className={`nav-btn ${isActive("/qa") ? "active" : ""}`}>
             <MessageSquare /> <span>{t("nav_qa")}</span>
           </Link>
-          <Link to="/ragdocs" className={`nav-btn ${isActive("/ragdocs") ? "active" : ""}`}>
-            <BookOpen /> <span>{t("nav_rag_docs")}</span>
-          </Link>
+          {(role === "cro_staff" || role === "admin") && (
+        <Link to="/ragdocs"
+    className={`nav-btn ${isActive("/ragdocs") ? "active" : ""}`}
+  >
+    <BookOpen /> <span>{t("nav_rag_docs")}</span>
+        </Link>
+)}
           <Link to="/ojt" className={`nav-btn ${isActive("/ojt") ? "active" : ""}`}>
             <BookOpen /> <span>{t("nav_ojt_docs")}</span>
           </Link>

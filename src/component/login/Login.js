@@ -204,33 +204,43 @@ function Login() {
 
   // ================= SUBMIT EMAIL LOGIN =================
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
+  e.preventDefault();
+  setError("");
+  setLoading(true);
 
-    const result = await loginApi(email, password);
-    setLoading(false);
+  const result = await loginApi(email, password);
+  setLoading(false);
 
-    if (!result.success) {
-      setError(result.message);
-      return;
-    }
+  if (!result.success) {
+    setError(result.message);
+    return;
+  }
 
-    const apiRole = result.user.role;
+  const apiRole = result.user.role;
 
-    const authUser = {
-      id: result.user.userId,
-      fullname: result.user.fullname,
-      email: result.user.email,
-      role: apiRole,
-    };
+  const companyId =
+    result.user.company_ID ??
+    result.user.companyId ??
+    null;
 
-    localStorage.setItem("authUser", JSON.stringify(authUser));
-    localStorage.setItem("userRole", apiRole);
-
-    setNotice(`🎉 Chào mừng, ${authUser.fullname}`);
-    setTimeout(() => navigate("/"), 1000);
+  const authUser = {
+    id: result.user.userId || result.user.id,
+    fullname: result.user.fullname,
+    email: result.user.email,
+    role: apiRole,
+    company_ID: companyId,
   };
+
+  localStorage.setItem("authUser", JSON.stringify(authUser));
+  localStorage.setItem("userRole", apiRole);
+
+  if (companyId !== null) {
+    localStorage.setItem("company_ID", String(companyId));
+  }
+
+  setNotice(`🎉 Chào mừng, ${authUser.fullname}`);
+  setTimeout(() => navigate("/"), 1000);
+};
 
   // ================= GOOGLE LOGIN =================
   const handleGoogleLogin = () => {
