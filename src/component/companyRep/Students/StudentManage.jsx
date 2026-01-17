@@ -10,6 +10,7 @@ export default function StudentManage() {
   const [selectedMajor, setSelectedMajor] = useState("");
   const [loading, setLoading] = useState(true);
 
+  // ===== KIỂM TRA STUDENT =====
   const isStudentUser = (u) => {
     if (!u) return false;
     if (u.roleId != null && Number(u.roleId) === 3) return true;
@@ -20,19 +21,41 @@ export default function StudentManage() {
   useEffect(() => {
     const loadData = async () => {
       try {
+        // ===== LẤY companyId USER ĐANG LOGIN =====
+        const currentCompanyId = Number(
+          localStorage.getItem("company_ID")
+        );
+
+        console.log("🔵 Current companyId:", currentCompanyId);
+
         const [userRes, majorRes] = await Promise.all([
           userApi.getAll(),
           majorApi.getAll(),
         ]);
 
-        // API trả về { succeeded, data } nên lấy data
+        // ===== LẤY DATA USER =====
         const users = Array.isArray(userRes?.data)
           ? userRes.data
           : userRes?.data?.data || [];
-        setStudents(users.filter(isStudentUser));
+
+        console.log("🟡 All users from API:", users);
+
+        // ===== LỌC STUDENT + CÙNG companyId =====
+        const filteredStudents = users.filter(
+          (u) =>
+            isStudentUser(u) &&
+            u.companyId === currentCompanyId
+        );
+
+        console.log(
+          "🟢 Students after companyId filter:",
+          filteredStudents
+        );
+
+        setStudents(filteredStudents);
         setMajors(majorRes.data.data || []);
       } catch (error) {
-        console.error("Error loading data:", error);
+        console.error("❌ Error loading data:", error);
         setStudents([]);
         setMajors([]);
       } finally {
@@ -43,13 +66,15 @@ export default function StudentManage() {
     loadData();
   }, []);
 
-  // Lọc theo tên và ngành
+  // ===== LỌC THEO TÊN + NGÀNH =====
   const filteredStudents = students.filter((stu) => {
     const matchName = String(stu.fullname ?? "")
       .toLowerCase()
       .includes(searchName.toLowerCase());
+
     const matchMajor =
       selectedMajor === "" || stu.majorId === Number(selectedMajor);
+
     return matchName && matchMajor;
   });
 
@@ -95,7 +120,9 @@ export default function StudentManage() {
           </thead>
           <tbody>
             {filteredStudents.map((stu) => {
-              const major = majors.find((m) => m.majorId === stu.majorId);
+              const major = majors.find(
+                (m) => m.majorId === stu.majorId
+              );
               return (
                 <tr key={stu.userId}>
                   <td>{stu.fullname}</td>

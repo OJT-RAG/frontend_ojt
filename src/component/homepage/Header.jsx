@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import { useI18n } from "../../i18n/i18n.jsx";
 import { useAuth } from "../Hook/useAuth.jsx";
 import {
@@ -12,10 +12,6 @@ const Header = () => {
   const { authUser, role, logout } = useAuth();
   const { lang, setLang, t } = useI18n();
   const location = useLocation();
-  const navigate = useNavigate();
-
-  const isAuthenticated = role !== "guest";
-  const canAccessRagDocs = role === "admin" || role === "cro_staff";
 
   const [activeSemester, setActiveSemester] = useState(null);
   const [isLangOpen, setIsLangOpen] = useState(false);
@@ -49,18 +45,16 @@ const Header = () => {
         </div>
 
         <nav className="nav">
-          {isAuthenticated && (
-            <>
-              <Link to="/qa" className={`nav-btn ${isActive("/qa") ? "active" : ""}`}>
-                <MessageSquare /> <span>{t("nav_qa")}</span>
-              </Link>
-              {canAccessRagDocs && (
-                <Link to="/ragdocs" className={`nav-btn ${isActive("/ragdocs") ? "active" : ""}`}>
-                  <BookOpen /> <span>{t("nav_rag_docs")}</span>
-                </Link>
-              )}
-            </>
-          )}
+          <Link to="/qa" className={`nav-btn ${isActive("/qa") ? "active" : ""}`}>
+            <MessageSquare /> <span>{t("nav_qa")}</span>
+          </Link>
+          {(role === "cro_staff" || role === "admin") && (
+        <Link to="/ragdocs"
+    className={`nav-btn ${isActive("/ragdocs") ? "active" : ""}`}
+  >
+    <BookOpen /> <span>{t("nav_rag_docs")}</span>
+        </Link>
+)}
           <Link to="/ojt" className={`nav-btn ${isActive("/ojt") ? "active" : ""}`}>
             <BookOpen /> <span>{t("nav_ojt_docs")}</span>
           </Link>
@@ -94,13 +88,7 @@ const Header = () => {
           </div>
 
           {role !== "guest" ? (
-            <button
-              className="btn btn-card"
-              onClick={() => {
-                logout();
-                navigate("/login", { replace: true });
-              }}
-            >
+            <button className="btn btn-card" onClick={logout}>
               <User /> <span>{t("logout")}</span>
             </button>
           ) : (
