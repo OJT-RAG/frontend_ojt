@@ -119,14 +119,19 @@ function Login() {
       const role = String(user?.role || jwtPayload?.role || "student").toLowerCase();
 
       const authUser = {
-        id: user?.userId || user?.id,
-        fullname: user?.fullname || jwtPayload?.name || "Google User",
-        email: user?.email || jwtPayload?.email,
-        role,
-      };
+  id: user?.userId || user?.id,
+  fullname: user?.fullname || jwtPayload?.name || "Google User",
+  email: user?.email || jwtPayload?.email,
+  role,
+  company_id: user?.company_ID || user?.companyId || null,
+};
 
-      login(role, authUser, token);
+// LƯU company_id
+if (authUser.company_id) {
+  localStorage.setItem("company_id", authUser.company_id);
+}
 
+login(role, authUser, token);
       setNotice("🎉 Đăng nhập Google thành công");
       navigate("/", { replace: true });
     } catch (err) {
@@ -248,14 +253,20 @@ function Login() {
 
     const apiRole = String(result.user.role || "student").toLowerCase();
 
-    const authUser = {
-      id: result.user.userId,
-      fullname: result.user.fullname,
-      email: result.user.email,
-      role: apiRole,
-    };
+const authUser = {
+  id: result.user.userId,
+  fullname: result.user.fullname,
+  email: result.user.email,
+  role: apiRole,
+  company_id: result.user.company_ID || result.user.companyId || null,
+};
 
-    login(apiRole, authUser, result.token);
+// LƯU company_id VÀO LOCALSTORAGE
+if (authUser.company_id) {
+  localStorage.setItem("company_id", authUser.company_id);
+}
+
+login(apiRole, authUser, result.token);
 
     setNotice(`🎉 Chào mừng, ${authUser.fullname}`);
     setTimeout(() => navigate("/"), 1000);

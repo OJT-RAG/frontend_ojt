@@ -154,12 +154,6 @@ html, body {
   padding-right: 4px;
 }
 
-.session-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .session-item {
   display: flex;
   justify-content: space-between;
@@ -172,7 +166,6 @@ html, body {
   font-size: 0.95rem;
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
   text-align: left;
-  width: 100%;
 }
 
 .session-item:hover {
@@ -200,22 +193,6 @@ html, body {
   color: #64748b;
   margin-left: 12px;
   white-space: nowrap;
-}
-
-.session-delete {
-  padding: 8px 10px;
-  border-radius: 8px;
-  border: 1px solid #fecaca;
-  background: #fff;
-  color: #b91c1c;
-  cursor: pointer;
-  font-size: 0.85rem;
-  font-weight: 600;
-  white-space: nowrap;
-}
-
-.session-delete:hover {
-  background: #fee2e2;
 }
 
 /* Main chat area */

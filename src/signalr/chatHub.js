@@ -9,7 +9,10 @@ class ChatHubService {
 
     this.connection = new signalR.HubConnectionBuilder()
       .withUrl(
-        `http://localhost:7031/chatHub?userId=${userId}`
+        `https://backend-production-8c235.up.railway.app/chatHub?userId=${userId}`,
+        {
+          withCredentials: false, // quan trọng khi deploy
+        }
       )
       .withAutomaticReconnect()
       .build();
@@ -20,7 +23,7 @@ class ChatHubService {
 
     try {
       await this.connection.start();
-      console.log("✅ SignalR connected");
+      console.log("✅ SignalR connected (Railway)");
     } catch (err) {
       console.error("❌ SignalR connect failed", err);
     }
@@ -39,9 +42,7 @@ class ChatHubService {
   }
 
   unsubscribe(callback) {
-    this.listeners = this.listeners.filter(
-      (cb) => cb !== callback
-    );
+    this.listeners = this.listeners.filter((cb) => cb !== callback);
   }
 }
 
