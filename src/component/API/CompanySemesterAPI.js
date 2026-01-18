@@ -8,6 +8,10 @@ const companySemesterApi = {
   // ✅ Lấy tất cả company – semester
   getAll: () =>
     httpClient.get("/semester-company/all"),
+
+  // ✅ Lấy 1 company – semester theo id
+  getById: (id) =>
+    httpClient.get(`/semester-company/${id}`),
 };
 
 export default companySemesterApi;

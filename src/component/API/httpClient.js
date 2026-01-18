@@ -5,7 +5,7 @@ const LOCAL_URL = "https://localhost:7031/api";
 const PRODUCTION_URL = "https://backend-production-8c235.up.railway.app/api";
 
 const httpClient = axios.create({
-  baseURL: LOCAL_URL, // Mặc định thử localhost trước
+  baseURL: PRODUCTION_URL, // Mặc định thử localhost trước
 });
 
 // Interceptor cho Request: Thêm Token như cũ

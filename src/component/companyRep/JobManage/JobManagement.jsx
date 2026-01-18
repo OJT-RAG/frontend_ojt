@@ -6,6 +6,8 @@ import jobPositionApi from "../../API/JobPositionAPI";
 import jobDescriptionApi from "../../API/JobDescriptionAPI";
 import majorApi from "../../API/MajorAPI";
 import semesterApi from "../../API/SemesterAPI";
+import companyApi from "../../API/CompanyAPI";
+import companySemesterApi from "../../API/CompanySemesterAPI";
 import "./JobManagement.css";
 
 const JobManagement = () => {
@@ -23,6 +25,8 @@ const JobManagement = () => {
 
   const [majors, setMajors] = useState([]);
   const [semesters, setSemesters] = useState([]);
+  const [semesterCompanies, setSemesterCompanies] = useState([]);
+  const [companies, setCompanies] = useState([]);
 
   const [activeTab, setActiveTab] = useState("positions");
   const [descriptionsByJobPositionId, setDescriptionsByJobPositionId] = useState({});
@@ -55,6 +59,67 @@ const JobManagement = () => {
       setSemesters(semesterRes.data?.data || []);
     } catch (err) {
       console.error("Failed to fetch majors/semesters:", err);
+    }
+  };
+
+  const fetchCompanies = async () => {
+    try {
+      const res = await companyApi.getAll();
+      setCompanies(res?.data?.data || res?.data || []);
+    } catch (err) {
+      console.error("Failed to fetch companies:", err);
+    }
+  };
+
+  const resolveSemesterCompanyId = (sc) =>
+    sc?.semesterCompanyId ?? sc?.semesterCompanyID ?? sc?.id ?? sc?.Id;
+
+  const resolveSemesterId = (sc) =>
+    sc?.semesterId ?? sc?.semesterID ?? sc?.semester?.semesterId;
+
+  const resolveCompanyId = (sc) =>
+    sc?.companyId ??
+    sc?.companyID ??
+    sc?.company_ID ??
+    sc?.company?.companyId ??
+    sc?.company?.company_ID;
+
+  const getCompanyIdFromStorage = () => {
+    const raw = localStorage.getItem("company_id");
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+  };
+
+  const getSemesterCompanyOptions = (semesterId) => {
+    const companyId = getCompanyIdFromStorage();
+
+    const filtered = semesterCompanies.filter((sc) => {
+      const scSemesterId = resolveSemesterId(sc);
+      const scCompanyId = resolveCompanyId(sc);
+      const matchSemester = semesterId ? scSemesterId === semesterId : true;
+      const matchCompany = companyId ? scCompanyId === companyId : true;
+      return matchSemester && matchCompany;
+    });
+
+    return filtered.length ? filtered : semesterCompanies;
+  };
+
+  const inferSemesterCompanyId = (semesterId) => {
+    const options = getSemesterCompanyOptions(semesterId);
+    if (options.length === 1) {
+      const onlyId = resolveSemesterCompanyId(options[0]);
+      return onlyId != null ? onlyId : null;
+    }
+    return null;
+  };
+
+  const fetchSemesterCompanies = async () => {
+    try {
+      const res = await companySemesterApi.getAll();
+      const list = res?.data?.data || res?.data || [];
+      setSemesterCompanies(list);
+    } catch (err) {
+      console.error("Failed to fetch semester companies:", err);
     }
   };
 
@@ -117,6 +182,8 @@ const JobManagement = () => {
       fetchJobs(),
       fetchJobPositions(),
       fetchMajorsSemesters(),
+      fetchCompanies(),
+      fetchSemesterCompanies(),
       fetchDescriptions(),
     ]);
   };
@@ -209,9 +276,11 @@ const JobManagement = () => {
     setEditPosition(null);
     positionForm.resetFields();
     const activeSemester = semesters.find((s) => s.isActive === true) || semesters[0];
+    const inferredSemesterCompanyId = inferSemesterCompanyId(activeSemester?.semesterId);
     positionForm.setFieldsValue({
       isActive: true,
       semesterId: activeSemester?.semesterId,
+      ...(inferredSemesterCompanyId ? { semesterCompanyId: inferredSemesterCompanyId } : {}),
     });
     setIsPositionModalOpen(true);
   };
@@ -223,6 +292,10 @@ const JobManagement = () => {
       ...record,
       majorId: record.majorId ?? record.major?.majorId,
       semesterId: record.semesterId ?? record.semester?.semesterId,
+      semesterCompanyId:
+        record.semesterCompanyId ??
+        record.semesterCompanyID ??
+        record.semesterCompany?.semesterCompanyId,
       jobTitleId: matchedJobTitle?.jobTitleId,
     };
     positionForm.setFieldsValue(normalized);
@@ -256,6 +329,11 @@ const JobManagement = () => {
 
       if (!payload.semesterId) {
         messageApi.error("Missing semesterId: please select a semester");
+        return;
+      }
+
+      if (!payload.semesterCompanyId) {
+        messageApi.error("Missing semesterCompanyId: please select semester-company");
         return;
       }
 
@@ -462,7 +540,64 @@ const JobManagement = () => {
   ];
 
   const getMajorTitle = (majorId) => majors.find((m) => m.majorId === majorId)?.majorTitle || "-";
-  const getSemesterName = (semesterId) => semesters.find((s) => s.semesterId === semesterId)?.name || "-";
+  const getSemesterName = (semesterId) =>
+    semesters.find((s) => (s?.semesterId ?? s?.semesterID ?? s?.id ?? s?.Id) === semesterId)?.name || "-";
+
+  const companyNameById = useMemo(() => {
+    const map = new Map();
+    for (const c of companies) {
+      const id = c?.companyId ?? c?.companyID ?? c?.company_ID ?? c?.id ?? c?.Id;
+      if (id != null) map.set(id, c?.companyName ?? c?.name ?? c?.fullName ?? "-");
+    }
+    return map;
+  }, [companies]);
+
+  const resolveJobPositionSemesterCompanyId = (jp) =>
+    jp?.semesterCompanyId ?? jp?.semesterCompanyID ?? jp?.semesterCompanyid;
+
+  const resolveJobPositionSemesterId = (jp) =>
+    jp?.semesterId ?? jp?.semesterID ?? jp?.semesterid ?? jp?.semester?.semesterId;
+
+  const resolveJobPositionCompanyId = (jp) =>
+    jp?.companyId ?? jp?.companyID ?? jp?.company_ID ?? jp?.company_id ?? jp?.company?.companyId;
+
+  const semesterCompanyById = useMemo(() => {
+    const map = new Map();
+    for (const sc of semesterCompanies) {
+      const id = resolveSemesterCompanyId(sc);
+      if (id != null) map.set(id, sc);
+    }
+    return map;
+  }, [semesterCompanies]);
+
+  const getSemesterNameFromSemesterCompany = (sc) => {
+    const semesterId = resolveSemesterId(sc);
+    return getSemesterName(semesterId) || "-";
+  };
+
+  const getCompanyNameFromSemesterCompany = (sc) => {
+    const companyId = resolveCompanyId(sc);
+    return companyNameById.get(companyId) || "-";
+  };
+
+  const getSemesterCompanyInfo = (record) => {
+    const directId = resolveJobPositionSemesterCompanyId(record);
+    const semesterId = resolveJobPositionSemesterId(record);
+    const recordCompanyId = resolveJobPositionCompanyId(record);
+
+    const inferredId = directId ?? inferSemesterCompanyId(semesterId);
+    const sc = inferredId != null ? semesterCompanyById.get(inferredId) : null;
+
+    const semesterName =
+      sc != null ? getSemesterNameFromSemesterCompany(sc) : getSemesterName(semesterId);
+
+    const companyName =
+      (sc != null ? getCompanyNameFromSemesterCompany(sc) : null) ||
+      companyNameById.get(recordCompanyId) ||
+      "-";
+
+    return { semesterName, companyName, semesterCompanyId: inferredId };
+  };
 
   const positionColumns = [
     { title: "ID", dataIndex: "jobPositionId", key: "jobPositionId", width: 80 },
@@ -477,7 +612,12 @@ const JobManagement = () => {
       title: "Semester",
       dataIndex: "semesterId",
       key: "semesterId",
-      render: (semesterId) => getSemesterName(semesterId),
+      render: (_, record) => getSemesterCompanyInfo(record).semesterName,
+    },
+    {
+      title: "Company",
+      key: "company",
+      render: (_, record) => getSemesterCompanyInfo(record).companyName,
     },
     { title: "Location", dataIndex: "location", key: "location" },
     { title: "Salary", dataIndex: "salaryRange", key: "salaryRange" },
@@ -803,10 +943,35 @@ const JobManagement = () => {
           >
             <Select
               placeholder="Select semester"
+              onChange={(semesterId) => {
+                const inferred = inferSemesterCompanyId(semesterId);
+                positionForm.setFieldsValue({
+                  semesterCompanyId: inferred || undefined,
+                });
+              }}
               options={semesters.map((s) => ({
                 label: s.name,
                 value: s.semesterId,
               }))}
+            />
+          </Form.Item>
+
+          <Form.Item
+            label="Semester Company"
+            name="semesterCompanyId"
+            rules={[{ required: true, message: "Please select semester company" }]}
+          >
+            <Select
+              placeholder="Select semester-company"
+              options={getSemesterCompanyOptions(positionForm.getFieldValue("semesterId")).map((sc) => {
+                const id = resolveSemesterCompanyId(sc);
+                const semesterId = resolveSemesterId(sc);
+                const companyId = resolveCompanyId(sc);
+                return {
+                  label: `ID: ${id} (semesterId: ${semesterId ?? "-"}, companyId: ${companyId ?? "-"})`,
+                  value: id,
+                };
+              })}
             />
           </Form.Item>
 
