@@ -7,6 +7,40 @@
     margin-bottom: 1rem;
   }
 
+  .dm-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 1rem;
+    flex-wrap: wrap;
+  }
+
+  .dm-toolbar-left {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+    min-width: 280px;
+  }
+
+  .dm-toolbar-right {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .dm-search {
+    flex: 1;
+    min-width: 220px;
+    max-width: 520px;
+    padding: 0.55rem 0.8rem;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    font-size: 0.9rem;
+    color: #0f172a;
+  }
+
   .toolbar-left .btn-primary {
     border-radius: 9999px;
     padding-inline: 1.5rem;
@@ -17,16 +51,91 @@
     justify-content: center;
   }
 
-  .document-list {
+  .dm-table {
     margin-top: 1.25rem;
   }
 
-  .doc-item {
-    border-radius: 1rem;
-    border: 1px solid rgba(148, 163, 184, 0.3);
+  .dm-title a {
+    color: #2563eb;
+    font-weight: 600;
+    text-decoration: none;
   }
 
-  .doc-icon {
-    font-weight: 700;
+  .dm-title a:hover {
+    text-decoration: underline;
+  }
+
+  .dm-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .dm-modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(15, 23, 42, 0.55);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    z-index: 9999;
+  }
+
+  .dm-modal {
+    width: min(560px, 100%);
+    border-radius: 14px;
+    background: #fff;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    padding: 16px;
+    box-shadow: 0 16px 40px rgba(2, 6, 23, 0.3);
+  }
+
+  .dm-modal h3 {
+    margin: 0 0 12px 0;
+    font-size: 1.1rem;
+  }
+
+  .dm-form {
+    display: grid;
+    gap: 12px;
+  }
+
+  .dm-form label {
+    display: grid;
+    gap: 6px;
+    font-weight: 600;
+    color: #0f172a;
+  }
+
+  .dm-form input,
+  .dm-form select {
+    width: 100%;
+    padding: 0.6rem 0.75rem;
+    border-radius: 10px;
+    border: 1px solid #e2e8f0;
+    background: #fff;
+    font-size: 0.92rem;
+    color: #0f172a;
+  }
+
+  .dm-check {
+    display: inline-flex !important;
+    align-items: center;
+    gap: 10px !important;
+    font-weight: 600;
+    color: #334155;
+  }
+
+  .dm-check input {
+    width: auto;
+  }
+
+  .dm-form-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 10px;
+    margin-top: 4px;
   }
 }
