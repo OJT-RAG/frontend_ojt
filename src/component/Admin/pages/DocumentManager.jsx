@@ -36,6 +36,7 @@ const DocumentManager = () => {
 
   useEffect(() => {
     let cancelled = false;
+    let loggedOnce = false;
 
     const load = async () => {
       setLoading(true);
@@ -49,8 +50,14 @@ const DocumentManager = () => {
         const list = docRes?.data?.data || [];
         const semList = semRes?.data?.data || [];
 
+        if (!loggedOnce && Array.isArray(list) && list.length > 0) {
+          loggedOnce = true;
+          // eslint-disable-next-line no-console
+          console.log("[DocumentManager] first document payload:", list[0]);
+        }
+
         if (cancelled) return;
-        setDocuments(Array.isArray(list) ? list : []);
+        setDocuments(sortDocumentsById(list));
         setSemesters(Array.isArray(semList) ? semList : []);
 
         if (!createForm.semesterId && Array.isArray(semList) && semList.length > 0) {
@@ -80,13 +87,89 @@ const DocumentManager = () => {
     return map;
   }, [semesters]);
 
+  const getDocId = (doc) => {
+    const extractFromObject = (obj) => {
+      if (!obj || typeof obj !== "object") return null;
+
+      const directCandidates = [
+        obj.ojtDocumentId,
+        obj.OjtDocumentId,
+        obj.ojtDocumentID,
+        obj.OjtDocumentID,
+        obj.ojt_document_id,
+        obj.id,
+        obj.Id,
+        obj.documentId,
+        obj.DocumentId,
+      ];
+
+      for (const value of directCandidates) {
+        if (value == null) continue;
+        const n = Number(value);
+        if (Number.isFinite(n) && n > 0) return n;
+        const s = String(value).trim();
+        if (s !== "") return value;
+      }
+
+      // Fallback: case-insensitive key match for common id keys.
+      try {
+        const keys = Object.keys(obj);
+        const normalized = (k) => String(k).toLowerCase().replace(/[^a-z0-9]/g, "");
+        const wanted = new Set(["ojtdocumentid", "documentid", "id"]);
+        for (const k of keys) {
+          if (!wanted.has(normalized(k))) continue;
+          const value = obj[k];
+          if (value == null) continue;
+          const n = Number(value);
+          if (Number.isFinite(n) && n > 0) return n;
+          const s = String(value).trim();
+          if (s !== "") return value;
+        }
+      } catch {
+        // ignore
+      }
+
+      return null;
+    };
+
+    // Common nested shapes
+    return (
+      extractFromObject(doc) ||
+      extractFromObject(doc?.ojtDocument) ||
+      extractFromObject(doc?.OjtDocument) ||
+      extractFromObject(doc?.data) ||
+      null
+    );
+  };
+
+  const sortDocumentsById = (list) => {
+    if (!Array.isArray(list)) return [];
+    const copy = [...list];
+    copy.sort((a, b) => {
+      const aId = getDocId(a);
+      const bId = getDocId(b);
+
+      const aNum = Number(aId);
+      const bNum = Number(bId);
+      const aIsNum = Number.isFinite(aNum);
+      const bIsNum = Number.isFinite(bNum);
+
+      if (aIsNum && bIsNum) return aNum - bNum; // ascending
+      if (aIsNum) return -1;
+      if (bIsNum) return 1;
+
+      return String(aId ?? "").localeCompare(String(bId ?? ""));
+    });
+    return copy;
+  };
+
   const closeUpload = () => {
     setUploadOpen(false);
     setCreateForm((p) => ({ ...p, title: "", file: null }));
   };
 
   const openEdit = (doc) => {
-    const docId = doc?.ojtDocumentId ?? doc?.OjtDocumentId;
+    const docId = getDocId(doc);
     if (docId == null) return;
     setEditingDoc(doc);
     setEditForm({
@@ -107,7 +190,7 @@ const DocumentManager = () => {
   const refreshDocuments = async () => {
     const docRes = await ojtDocumentApi.getAll();
     const list = docRes?.data?.data || [];
-    setDocuments(Array.isArray(list) ? list : []);
+    setDocuments(sortDocumentsById(list));
   };
 
   const validateFile = (file) => {
@@ -164,7 +247,7 @@ const DocumentManager = () => {
   };
 
   const submitUpdate = async () => {
-    const docId = editingDoc?.ojtDocumentId ?? editingDoc?.OjtDocumentId;
+    const docId = getDocId(editingDoc);
     if (!docId) return;
 
     const title = String(editForm.title || "").trim();
@@ -207,7 +290,7 @@ const DocumentManager = () => {
   };
 
   const deleteDoc = async (doc) => {
-    const docId = doc?.ojtDocumentId ?? doc?.OjtDocumentId;
+    const docId = getDocId(doc);
     if (!docId) return;
 
     const ok = window.confirm(`Delete document #${docId}?`);
@@ -215,8 +298,8 @@ const DocumentManager = () => {
 
     try {
       await ojtDocumentApi.delete(docId);
-      setDocuments((prev) => prev.filter((d) => (d?.ojtDocumentId ?? d?.OjtDocumentId) !== docId));
-      if ((editingDoc?.ojtDocumentId ?? editingDoc?.OjtDocumentId) === docId) closeEdit();
+      setDocuments((prev) => sortDocumentsById((prev || []).filter((d) => getDocId(d) !== docId)));
+      if (getDocId(editingDoc) === docId) closeEdit();
     } catch (e) {
       const status = e?.response?.status;
       const serverMessage = e?.response?.data?.message || e?.response?.data?.title;
@@ -291,14 +374,15 @@ const DocumentManager = () => {
                 <td colSpan={6}>No documents found.</td>
               </tr>
             ) : (
-              filteredDocuments.map((doc) => {
-                const id = doc?.ojtDocumentId ?? doc?.OjtDocumentId;
+              filteredDocuments.map((doc, idx) => {
+                const id = getDocId(doc);
                 const semesterId = doc?.semesterId;
                 const semesterName = semesterNameById.get(Number(semesterId)) || semesterId || "-";
                 const url = doc?.fileUrl;
+                const actionsDisabled = !id;
 
                 return (
-                  <tr key={id}>
+                  <tr key={id ?? `doc-row-${idx}`}>
                     <td>{id}</td>
                     <td className="dm-title">
                       {url ? (
@@ -318,10 +402,22 @@ const DocumentManager = () => {
                           Download
                         </a>
                       )}
-                      <button className="btn-secondary" type="button" onClick={() => openEdit(doc)}>
+                      <button
+                        className="btn-secondary"
+                        type="button"
+                        onClick={() => openEdit(doc)}
+                        disabled={actionsDisabled}
+                        title={actionsDisabled ? "Cannot edit: missing document id from API" : ""}
+                      >
                         Update
                       </button>
-                      <button className="btn-danger" type="button" onClick={() => deleteDoc(doc)}>
+                      <button
+                        className="btn-danger"
+                        type="button"
+                        onClick={() => deleteDoc(doc)}
+                        disabled={actionsDisabled}
+                        title={actionsDisabled ? "Cannot delete: missing document id from API" : ""}
+                      >
                         Delete
                       </button>
                     </td>

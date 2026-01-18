@@ -21,6 +21,15 @@ const sanitizeBaseUrl = (value) => {
 
 const nowIso = () => new Date().toISOString();
 
+const CV_ACCEPT = [
+  ".pdf",
+  ".doc",
+  ".docx",
+  "application/pdf",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+].join(",");
+
 
 const normalizeMessage = (message) => {
   if (!message || typeof message !== "object") return null;
@@ -264,6 +273,7 @@ const interpretStatus = (payload) => {
 const ChatPage = () => {
   const { t } = useI18n();
   const initialSessionsRef = useRef(null);
+  const cvInputRef = useRef(null);
   const navigate = useNavigate();
 
   if (initialSessionsRef.current === null) {
@@ -276,6 +286,7 @@ const ChatPage = () => {
     initialSessionsRef.current[0]?.id || null
   );
   const [inputValue, setInputValue] = useState("");
+  const [cvFile, setCvFile] = useState(null);
   const [sending, setSending] = useState(false);
   const [loadingHistory, setLoadingHistory] = useState(false);
   const [serviceStatus, setServiceStatus] = useState({ state: "checking", lastChecked: null });
@@ -544,10 +555,46 @@ const ChatPage = () => {
     ];
   }, [t]);
 
+  const clearCvFile = useCallback(() => {
+    setCvFile(null);
+    if (cvInputRef.current) {
+      cvInputRef.current.value = "";
+    }
+  }, []);
+
+  const handleCvFileChange = useCallback((event) => {
+    const file = event?.target?.files?.[0] || null;
+    if (!file) {
+      setCvFile(null);
+      return;
+    }
+
+    const maxBytes = 10 * 1024 * 1024; // 10MB
+    if (file.size > maxBytes) {
+      setLastError(
+        (typeof t === "function" && t("chat_cv_file_too_large")) ||
+          "CV file is too large (max 10MB)."
+      );
+      if (cvInputRef.current) {
+        cvInputRef.current.value = "";
+      }
+      return;
+    }
+
+    setLastError("");
+    setCvFile(file);
+  }, [t]);
+
   const handleSend = useCallback(async () => {
     if (sending) return;
     const text = inputValue.trim();
-    if (!text) return;
+
+    const defaultCvPrompt =
+      (typeof t === "function" && t("chat_cv_default_prompt")) ||
+      "Please review my CV and suggest improvements and suitable internship positions.";
+
+    const question = text || (cvFile ? defaultCvPrompt : "");
+    if (!question) return;
 
     setInputValue("");
     setLastError("");
@@ -558,7 +605,7 @@ const ChatPage = () => {
     const userMessage = {
       id: `user-${Date.now()}`,
       role: "user",
-      text,
+      text: cvFile && !text ? `${question}\n(CV: ${cvFile.name})` : question,
       timestamp: nowIso(),
     };
 
@@ -621,16 +668,20 @@ const ChatPage = () => {
     }
 
     try {
+      const formData = new FormData();
+      formData.append("question", question);
+      // Keep session_id for backward compatibility with existing history behavior.
+      formData.append("session_id", String(sessionId));
+      if (cvFile) {
+        formData.append("file", cvFile);
+      }
+
       const response = await fetch(`${ragBaseUrl}/chat`, {
         method: "POST",
         headers: {
-          "Content-Type": "application/json",
           Accept: "application/json",
         },
-        body: JSON.stringify({
-          question: text,
-          session_id: sessionId,
-        }),
+        body: formData,
       });
 
       const contentType = response.headers.get("content-type") || "";
@@ -679,6 +730,11 @@ const ChatPage = () => {
             : session
         )
       );
+
+      // Clear CV after a successful send to avoid re-uploading by accident.
+      if (cvFile) {
+        clearCvFile();
+      }
     } catch (error) {
       console.error("Chat request failed", error);
       const message = error?.message || t("chat_message_failed");
@@ -706,7 +762,7 @@ const ChatPage = () => {
     } finally {
       setSending(false);
     }
-  }, [sending, inputValue, activeSessionId, ragBaseUrl, t]);
+  }, [sending, inputValue, activeSessionId, ragBaseUrl, t, cvFile, clearCvFile]);
 
   const handleSuggestionClick = (suggestion) => {
     setInputValue(suggestion);
@@ -872,16 +928,58 @@ const ChatPage = () => {
           )}
 
           <form className="chatpage-input" onSubmit={handleSubmit}>
-            <input
-              type="text"
-              value={inputValue}
-              placeholder={t("chat_placeholder")}
-              onChange={(event) => setInputValue(event.target.value)}
-              disabled={sending}
-            />
-            <button type="submit" disabled={sending || inputValue.trim().length === 0}>
-              {sending ? t("chat_sending_state") : t("chat_send_button")}
-            </button>
+            <div className="chatpage-file-row">
+              <input
+                ref={cvInputRef}
+                className="chatpage-file-input"
+                type="file"
+                accept={CV_ACCEPT}
+                onChange={handleCvFileChange}
+                disabled={sending}
+              />
+
+              <button
+                type="button"
+                className="attach-btn"
+                onClick={() => cvInputRef.current?.click()}
+                disabled={sending}
+              >
+                {(typeof t === "function" && t("chat_attach_cv")) || "Attach CV"}
+              </button>
+
+              {cvFile && (
+                <div className="file-chip" title={cvFile.name}>
+                  <span className="file-name">{cvFile.name}</span>
+                  <button
+                    type="button"
+                    className="file-remove"
+                    onClick={clearCvFile}
+                    disabled={sending}
+                    aria-label="Remove attached CV"
+                    title="Remove"
+                  >
+                    ×
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="chatpage-input-row">
+              <input
+                type="text"
+                value={inputValue}
+                placeholder={t("chat_placeholder")}
+                onChange={(event) => setInputValue(event.target.value)}
+                disabled={sending}
+              />
+              <button
+                className="send-btn"
+                type="submit"
+                disabled={sending || (inputValue.trim().length === 0 && !cvFile)}
+              >
+                {sending ? t("chat_sending_state") : t("chat_send_button")}
+              </button>
+            </div>
           </form>
         </main>
       </div>
