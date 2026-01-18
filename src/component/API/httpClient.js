@@ -1,7 +1,7 @@
 import axios from "axios";
 
 const PRODUCTION_URL =
-  "https://backend-production-8c235.up.railway.app/api";
+  "https://backend-production-c7bc.up.railway.app/api";
 
 const httpClient = axios.create({
   baseURL: PRODUCTION_URL,
