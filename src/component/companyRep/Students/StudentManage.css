@@ -1,53 +1,92 @@
-.student-container {
-  max-width: 1100px;
-  margin: 40px auto;
-  padding: 20px;
-  background: white;
-  border-radius: 10px;
-  box-shadow: 0 4px 10px rgba(0,0,0,0.08);
+.student-manage {
+  padding: 24px;
+  background-color: #f9fafb;
+  min-height: 100vh;
+  font-family: Arial, Helvetica, sans-serif;
 }
 
-.title {
-  font-size: 24px;
-  font-weight: bold;
+.student-manage h2 {
   margin-bottom: 20px;
+  font-size: 22px;
+  font-weight: 600;
+  color: #333;
 }
 
-.filters {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-
-.search-input, 
-.select-filter {
-  padding: 10px;
-  font-size: 15px;
-  border-radius: 6px;
-  border: 1px solid #ccc;
-  width: 250px;
-}
-
-.student-table {
+/* ===== TABLE ===== */
+.student-manage table {
   width: 100%;
   border-collapse: collapse;
+  background-color: #fff;
+  border-radius: 8px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
 }
 
-.student-table th {
-  background: #0077cc;
-  color: white;
-  padding: 12px;
+.student-manage thead {
+  background-color: #f0f2f5;
+}
+
+.student-manage th,
+.student-manage td {
+  padding: 12px 14px;
   text-align: left;
+  border-bottom: 1px solid #e5e7eb;
+  font-size: 14px;
 }
 
-.student-table td {
-  padding: 10px;
-  border-bottom: 1px solid #eee;
+.student-manage th {
+  font-weight: 600;
+  color: #374151;
 }
 
-.no-data,
-.loading {
-  text-align: center;
-  padding: 15px;
-  color: #777;
+.student-manage td {
+  color: #4b5563;
+}
+
+/* ===== ROW HOVER ===== */
+.student-manage tbody tr:hover {
+  background-color: #f9fafb;
+}
+
+/* ===== EMPTY STATE ===== */
+.student-manage p {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 768px) {
+  .student-manage table,
+  .student-manage thead,
+  .student-manage tbody,
+  .student-manage th,
+  .student-manage td,
+  .student-manage tr {
+    display: block;
+  }
+
+  .student-manage thead {
+    display: none;
+  }
+
+  .student-manage tr {
+    margin-bottom: 16px;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 10px;
+  }
+
+  .student-manage td {
+    display: flex;
+    justify-content: space-between;
+    padding: 8px 10px;
+    border: none;
+    border-bottom: 1px solid #e5e7eb;
+  }
+
+  .student-manage td::before {
+    content: attr(data-label);
+    font-weight: 600;
+    color: #374151;
+  }
 }
