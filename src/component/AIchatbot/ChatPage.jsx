@@ -21,6 +21,49 @@ const sanitizeBaseUrl = (value) => {
 
 const nowIso = () => new Date().toISOString();
 
+const formatSource = (source) => {
+  if (source == null) return { key: "source-null", label: "", href: "" };
+
+  if (typeof source === "string") {
+    const trimmed = source.trim();
+    const isHttp = /^https?:\/\//i.test(trimmed);
+    return { key: trimmed || "source", label: trimmed, href: isHttp ? trimmed : "" };
+  }
+
+  if (typeof source === "object") {
+    const displayName =
+      typeof source.display_name === "string"
+        ? source.display_name
+        : typeof source.displayName === "string"
+        ? source.displayName
+        : "";
+
+    const uri =
+      typeof source.gcs_uri === "string"
+        ? source.gcs_uri
+        : typeof source.gcsUri === "string"
+        ? source.gcsUri
+        : typeof source.url === "string"
+        ? source.url
+        : "";
+
+    const resourceName =
+      typeof source.resource_name === "string"
+        ? source.resource_name
+        : typeof source.resourceName === "string"
+        ? source.resourceName
+        : "";
+
+    const label = displayName || uri || resourceName || "source";
+    const href = /^https?:\/\//i.test(uri) ? uri : "";
+    const key = uri || resourceName || label;
+    return { key, label, href };
+  }
+
+  const fallback = String(source);
+  return { key: fallback, label: fallback, href: "" };
+};
+
 const CV_ACCEPT = [
   ".pdf",
   ".doc",
@@ -900,9 +943,20 @@ const ChatPage = () => {
                 <pre>{message.text}</pre>
                 {message.sources && message.sources.length > 0 && (
                   <ul className="chat-sources">
-                    {message.sources.map((source, index) => (
-                      <li key={`${message.id}-source-${index}`}>{source}</li>
-                    ))}
+                    {message.sources.map((source, index) => {
+                      const info = formatSource(source);
+                      return (
+                        <li key={`${message.id}-source-${info.key}-${index}`}>
+                          {info.href ? (
+                            <a href={info.href} target="_blank" rel="noreferrer">
+                              {info.label}
+                            </a>
+                          ) : (
+                            <span>{info.label}</span>
+                          )}
+                        </li>
+                      );
+                    })}
                   </ul>
                 )}
               </div>

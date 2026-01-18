@@ -10,8 +10,45 @@ const sanitizeBaseUrl = (value) => {
 	return value.trim().replace(/\/$/, "");
 };
 
+const normalizeFileEntry = (entry) => {
+	// Backend may return strings (gcs_uri) OR objects ({display_name,gcs_uri,resource_name}).
+	if (entry == null) return { key: "file-null", gcsUri: "", label: "" };
+	if (typeof entry === "string") {
+		const v = entry.trim();
+		return { key: v || "file", gcsUri: v, label: v };
+	}
+	if (typeof entry === "object") {
+		const displayName =
+			typeof entry.display_name === "string"
+				? entry.display_name
+				: typeof entry.displayName === "string"
+				? entry.displayName
+				: "";
+		const gcsUri =
+			typeof entry.gcs_uri === "string"
+				? entry.gcs_uri
+				: typeof entry.gcsUri === "string"
+				? entry.gcsUri
+				: "";
+		const resourceName =
+			typeof entry.resource_name === "string"
+				? entry.resource_name
+				: typeof entry.resourceName === "string"
+				? entry.resourceName
+				: "";
+
+		const label = displayName || gcsUri || resourceName || "(unknown file)";
+		const key = gcsUri || resourceName || displayName || JSON.stringify(entry);
+		return { key, gcsUri, label, raw: entry };
+	}
+
+	const fallback = String(entry);
+	return { key: fallback, gcsUri: fallback, label: fallback };
+};
+
 const OJTdocsAdmin = () => {
 	const [files, setFiles] = useState([]);
+	const [rawFiles, setRawFiles] = useState(null);
 	const [loading, setLoading] = useState(false);
 	const [importing, setImporting] = useState(false);
 	const [deleting, setDeleting] = useState(null);
@@ -48,8 +85,18 @@ const OJTdocsAdmin = () => {
 				console.error("List files failed", res.status, res.statusText, text);
 				throw new Error(text || `HTTP ${res.status}`);
 			}
-			const data = await res.json();
-			setFiles(Array.isArray(data?.files) ? data.files : []);
+			const data = await res.json().catch(() => ({}));
+			const list = Array.isArray(data?.files) ? data.files : [];
+			setRawFiles(list);
+
+			const normalized = list.map((entry) => normalizeFileEntry(entry));
+			console.groupCollapsed("[RAGdocs] /list_files response");
+			console.log({ url: `${baseUrl}/list_files`, count: list.length, sample: list[0] });
+			console.log("raw files:", list);
+			console.log("normalized files:", normalized);
+			console.groupEnd();
+
+			setFiles(normalized);
 		} catch (err) {
 			setError(err.message || "Failed to load files");
 		} finally {
@@ -94,11 +141,17 @@ const OJTdocsAdmin = () => {
 		}
 	};
 
-	const handleDelete = async (fileId) => {
-		setDeleting(fileId);
+	const handleDelete = async (file) => {
+		const gcsUri = typeof file === "string" ? file : file?.gcsUri;
+		if (!gcsUri) {
+			console.error("Delete failed: missing gcs_uri", file);
+			setError("Missing gcs_uri for delete");
+			return;
+		}
+		setDeleting(gcsUri);
 		setError("");
 		try {
-			const url = `${baseUrl}/delete_file?gcs_uri=${encodeURIComponent(fileId)}`;
+			const url = `${baseUrl}/delete_file?gcs_uri=${encodeURIComponent(gcsUri)}`;
 			const res = await fetch(url, { method: "DELETE" });
 			const text = await res.text();
 			if (!res.ok) {
@@ -147,6 +200,11 @@ const OJTdocsAdmin = () => {
 					</div>
 
 					{error && <div className="alert">{error}</div>}
+					{Array.isArray(rawFiles) && rawFiles.length > 0 && files.length === 0 && (
+						<div className="alert">
+							Unexpected file format from API. Check console logs.
+						</div>
+					)}
 
 					<div className="table-wrapper">
 						<table>
@@ -163,17 +221,17 @@ const OJTdocsAdmin = () => {
 									</tr>
 								)}
 								{files.map((file) => (
-									<tr key={file}>
+									<tr key={file.key}>
 										<td>
-											<code className="code-chip">{file}</code>
+											<code className="code-chip">{file.label}</code>
 										</td>
 										<td>
 											<button
 												className="btn danger"
 												onClick={() => handleDelete(file)}
-												disabled={deleting === file}
+												disabled={deleting === file.gcsUri}
 											>
-												{deleting === file ? "Deleting..." : "Delete"}
+												{deleting === file.gcsUri ? "Deleting..." : "Delete"}
 											</button>
 										</td>
 									</tr>
