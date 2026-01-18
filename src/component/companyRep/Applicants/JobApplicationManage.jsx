@@ -8,13 +8,19 @@ export default function JobApplicationManage() {
   const [rejectingId, setRejectingId] = useState(null);
 
   const fetchApplications = async () => {
-    try {
-      const res = await jobApplicationApi.getAll();
-      setApplications(res.data.data || []);
-    } catch (err) {
-      console.error("Fetch job applications failed", err);
-    }
-  };
+  try {
+    const res = await jobApplicationApi.getAll();
+
+    const pendingApps = (res.data.data || []).filter(
+      (app) => app.status === "pending"
+    );
+
+    setApplications(pendingApps);
+  } catch (err) {
+    console.error("Fetch job applications failed", err);
+  }
+};
+
 
   useEffect(() => {
     fetchApplications();
