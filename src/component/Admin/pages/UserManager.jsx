@@ -209,22 +209,43 @@ const UserManager = () => {
     const fd = new FormData();
     fd.append('UserId', String(editingUser.userId));
 
-    const appendIfChanged = (fieldName, value, initialValue) => {
-      if (!editInitial) {
-        fd.append(fieldName, value ?? '');
-        return;
-      }
-      if ((value ?? '') !== (initialValue ?? '')) {
-        fd.append(fieldName, value ?? '');
+    const hasChanged = (value, initialValue) => (String(value ?? '') !== String(initialValue ?? ''));
+
+    const appendIfChangedText = (fieldName, value, initialValue) => {
+      const next = String(value ?? '');
+      const prev = String(initialValue ?? '');
+      if (!editInitial || next !== prev) {
+        // Avoid sending undefined/null; backend expects strings.
+        fd.append(fieldName, next);
       }
     };
 
-    appendIfChanged('Fullname', editForm.fullname, editInitial?.fullname);
-    appendIfChanged('StudentCode', editForm.studentCode, editInitial?.studentCode);
-    appendIfChanged('Dob', editForm.dob, editInitial?.dob);
-    appendIfChanged('Phone', editForm.phone, editInitial?.phone);
-    appendIfChanged('MajorId', editForm.majorId, editInitial?.majorId);
-    appendIfChanged('CompanyId', editForm.companyId, editInitial?.companyId);
+    const appendIfChangedInt = (fieldName, value, initialValue) => {
+      const nextRaw = String(value ?? '').trim();
+      const prevRaw = String(initialValue ?? '').trim();
+      if (editInitial && nextRaw === prevRaw) return;
+
+      // Important: do NOT send empty string for numeric fields (can cause backend 500).
+      if (nextRaw === '') {
+        console.warn(`[Admin][UserUpdate] Skipping ${fieldName}=<empty>. Backend may not accept empty numeric values.`);
+        return;
+      }
+
+      const n = Number(nextRaw);
+      if (!Number.isFinite(n)) {
+        console.warn(`[Admin][UserUpdate] Skipping ${fieldName} (not a number):`, nextRaw);
+        return;
+      }
+
+      fd.append(fieldName, String(n));
+    };
+
+    appendIfChangedText('Fullname', editForm.fullname, editInitial?.fullname);
+    appendIfChangedText('StudentCode', editForm.studentCode, editInitial?.studentCode);
+    appendIfChangedText('Dob', editForm.dob, editInitial?.dob);
+    appendIfChangedText('Phone', editForm.phone, editInitial?.phone);
+    appendIfChangedInt('MajorId', editForm.majorId, editInitial?.majorId);
+    appendIfChangedInt('CompanyId', editForm.companyId, editInitial?.companyId);
 
     if (editForm.password?.trim()) {
       fd.append('Password', editForm.password);
@@ -236,13 +257,41 @@ const UserManager = () => {
       fd.append('CvUrl', editForm.cvFile);
     }
 
+    // Debug outgoing payload
+    try {
+      const entries = [];
+      // eslint-disable-next-line no-restricted-syntax
+      for (const [k, v] of fd.entries()) {
+        if (v instanceof File) {
+          entries.push([k, { name: v.name, type: v.type, size: v.size }]);
+        } else {
+          entries.push([k, v]);
+        }
+      }
+      console.groupCollapsed('[Admin][UserUpdate] FormData');
+      console.log('userId:', editingUser.userId);
+      console.table(entries.map(([k, v]) => ({ key: k, value: typeof v === 'string' ? v : JSON.stringify(v) })));
+      console.log('raw entries:', entries);
+      console.groupEnd();
+    } catch (logError) {
+      console.warn('[Admin][UserUpdate] Failed to log FormData', logError);
+    }
+
     setEditSaving(true);
     try {
       await userApi.update(fd);
       await refreshUsers();
       closeEdit();
     } catch (err) {
-      window.alert(err?.response?.data?.message || err?.message || 'Update failed');
+      console.error('[Admin][UserUpdate] Request failed', {
+        message: err?.message,
+        status: err?.response?.status,
+        statusText: err?.response?.statusText,
+        data: err?.response?.data,
+        url: err?.config?.url,
+        method: err?.config?.method,
+      });
+      window.alert(err?.response?.data?.message || err?.response?.data || err?.message || 'Update failed');
     } finally {
       setEditSaving(false);
     }

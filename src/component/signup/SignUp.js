@@ -17,8 +17,8 @@ function SignUp() {
     dob: '',
     majorId: '',
     companyId: '',
-    avatarUrl: '',
-    cvUrl: '',
+    avatarFile: null,
+    cvFile: null,
   });
   const [majors, setMajors] = useState([]);
   const [majorsLoading, setMajorsLoading] = useState(false);
@@ -31,7 +31,12 @@ function SignUp() {
   const { t } = useI18n();
 
   function onChange(e) {
-    setForm({ ...form, [e.target.name]: e.target.value });
+    const { name, value, files } = e.target;
+    if (name === 'avatarFile' || name === 'cvFile') {
+      setForm({ ...form, [name]: files?.[0] || null });
+      return;
+    }
+    setForm({ ...form, [name]: value });
   }
 
   const loadMajors = async () => {
@@ -103,30 +108,68 @@ function SignUp() {
     }
     setSubmitting(true);
     try {
-      const payload = {
-        majorId: form.majorId ? Number(form.majorId) : 0,
-        companyId: form.companyId ? Number(form.companyId) : 0,
-        // Backend DB requires role NOT NULL; default new accounts to student.
-        // (DTO binding is case-insensitive; include roleId as a fallback if backend uses numeric roles.)
-        role: 'student',
-        roleId: 3,
-        email: form.email || '',
-        password: form.password || '',
-        fullname: form.fullname || '',
-        studentCode: form.studentCode || '',
-        dob: form.dob || null, // expects YYYY-MM-DD
-        phone: form.phone || '',
-        avatarUrl: form.avatarUrl || '',
-        cvUrl: form.cvUrl || '',
-      };
+      // Backend (Swagger) expects multipart/form-data for /api/user/create.
+      const fd = new FormData();
+      fd.append('MajorId', String(form.majorId ? Number(form.majorId) : 0));
+      // CompanyId can be sent as an empty value (Swagger: -F 'CompanyId=').
+      fd.append('CompanyId', form.companyId ? String(Number(form.companyId)) : '');
+      fd.append('Email', form.email || '');
+      fd.append('Password', form.password || '');
+      fd.append('Fullname', form.fullname || '');
+      fd.append('StudentCode', form.studentCode || '');
+      fd.append('Dob', form.dob || '');
+      fd.append('Phone', form.phone || '');
 
-      const res = await userApi.create(payload);
+      // Optional files (Swagger fields are string($binary)).
+      if (form.avatarFile instanceof File) {
+        fd.append('AvatarUrl', form.avatarFile);
+      } else {
+        fd.append('AvatarUrl', '');
+      }
+      if (form.cvFile instanceof File) {
+        fd.append('CvUrl', form.cvFile);
+      } else {
+        fd.append('CvUrl', '');
+      }
+
+      // Debug outgoing payload
+      try {
+        const entries = [];
+        // eslint-disable-next-line no-restricted-syntax
+        for (const [k, v] of fd.entries()) {
+          if (v instanceof File) {
+            entries.push([k, { name: v.name, type: v.type, size: v.size }]);
+          } else {
+            entries.push([k, v]);
+          }
+        }
+        // eslint-disable-next-line no-console
+        console.groupCollapsed('[SignUp] /user/create FormData');
+        // eslint-disable-next-line no-console
+        console.table(entries.map(([k, v]) => ({ key: k, value: typeof v === 'string' ? v : JSON.stringify(v) })));
+        // eslint-disable-next-line no-console
+        console.log('raw entries:', entries);
+        // eslint-disable-next-line no-console
+        console.groupEnd();
+      } catch (logErr) {
+        // eslint-disable-next-line no-console
+        console.warn('[SignUp] Failed to log FormData', logErr);
+      }
+
+      const res = await userApi.create(fd);
       const serverMsg = res?.data?.message;
       alert(serverMsg || t('signup_submit_success'));
       navigate('/login', { replace: true });
     } catch (err) {
       // eslint-disable-next-line no-console
-      console.error('Signup failed:', err);
+      console.error('Signup failed:', {
+        message: err?.message,
+        status: err?.response?.status,
+        statusText: err?.response?.statusText,
+        data: err?.response?.data,
+        url: err?.config?.url,
+        method: err?.config?.method,
+      });
       const serverMsg = err?.response?.data?.message || err?.response?.data?.error;
       alert(serverMsg || err.message || t('signup_submit_error'));
     } finally {
@@ -191,8 +234,8 @@ function SignUp() {
             </button>
           </div>
         )}
-        <select name="companyId" value={form.companyId} onChange={onChange} aria-label={t('company')} required>
-          <option value="" disabled>{companiesLoading ? t('loading') : t('company')}</option>
+        <select name="companyId" value={form.companyId} onChange={onChange} aria-label={t('company')}>
+          <option value="">{companiesLoading ? t('loading') : '(no company)'}</option>
           {companies.map((c, idx) => {
             const id = (c && typeof c === 'object') ? c.id : (c != null ? String(c) : String(idx));
             const label = (c && typeof c === 'object') ? (c.name || id) : (c != null ? String(c) : id);
@@ -213,8 +256,14 @@ function SignUp() {
           </div>
         )}
 
-        <input name="avatarUrl" placeholder={t('avatar_url')} value={form.avatarUrl} onChange={onChange} aria-label={t('avatar_url')} />
-        <input name="cvUrl" placeholder={t('cv_url')} value={form.cvUrl} onChange={onChange} aria-label={t('cv_url')} />
+      <label style={{ width: '100%', display: 'block' }}>
+        {t('avatar_url')}
+        <input name="avatarFile" type="file" accept="image/*" onChange={onChange} aria-label={t('avatar_url')} />
+      </label>
+      <label style={{ width: '100%', display: 'block' }}>
+        {t('cv_url')}
+        <input name="cvFile" type="file" accept="application/pdf,.pdf" onChange={onChange} aria-label={t('cv_url')} />
+      </label>
 
         <div className="row">
           <button type="submit" disabled={submitting}>{submitting ? t('creating') : t('create_account_btn')}</button>
