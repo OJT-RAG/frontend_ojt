@@ -144,17 +144,20 @@ const DocumentManager = () => {
     try {
       setSaving(true);
       const formData = new FormData();
-      formData.append("Title", title);
-      formData.append("SemesterId", semesterId);
-      formData.append("IsGeneral", String(!!createForm.isGeneral));
-      formData.append("UploadedBy", String(uploadedBy));
-      formData.append("File", createForm.file);
+      // Use camelCase keys (commonly required by many backends for multipart binding)
+      formData.append("title", title);
+      formData.append("semesterId", semesterId);
+      formData.append("isGeneral", String(!!createForm.isGeneral));
+      formData.append("uploadedBy", String(uploadedBy));
+      formData.append("file", createForm.file, createForm.file?.name);
 
       await ojtDocumentApi.create(formData);
       await refreshDocuments();
       closeUpload();
     } catch (e) {
-      window.alert(e?.response?.data?.message || e?.message || "Upload failed");
+      const status = e?.response?.status;
+      const serverMessage = e?.response?.data?.message || e?.response?.data?.title;
+      window.alert(serverMessage || (status ? `Upload failed (HTTP ${status})` : e?.message || "Upload failed"));
     } finally {
       setSaving(false);
     }
@@ -185,17 +188,19 @@ const DocumentManager = () => {
     try {
       setSaving(true);
       const formData = new FormData();
-      formData.append("OjtDocumentId", String(docId));
-      formData.append("Title", title);
-      formData.append("SemesterId", semesterId);
-      formData.append("IsGeneral", String(!!editForm.isGeneral));
-      if (editForm.file) formData.append("File", editForm.file);
+      formData.append("ojtDocumentId", String(docId));
+      formData.append("title", title);
+      formData.append("semesterId", semesterId);
+      formData.append("isGeneral", String(!!editForm.isGeneral));
+      if (editForm.file) formData.append("file", editForm.file, editForm.file?.name);
 
       await ojtDocumentApi.update(formData);
       await refreshDocuments();
       closeEdit();
     } catch (e) {
-      window.alert(e?.response?.data?.message || e?.message || "Update failed");
+      const status = e?.response?.status;
+      const serverMessage = e?.response?.data?.message || e?.response?.data?.title;
+      window.alert(serverMessage || (status ? `Update failed (HTTP ${status})` : e?.message || "Update failed"));
     } finally {
       setSaving(false);
     }
@@ -213,7 +218,9 @@ const DocumentManager = () => {
       setDocuments((prev) => prev.filter((d) => (d?.ojtDocumentId ?? d?.OjtDocumentId) !== docId));
       if ((editingDoc?.ojtDocumentId ?? editingDoc?.OjtDocumentId) === docId) closeEdit();
     } catch (e) {
-      window.alert(e?.response?.data?.message || e?.message || "Delete failed");
+      const status = e?.response?.status;
+      const serverMessage = e?.response?.data?.message || e?.response?.data?.title;
+      window.alert(serverMessage || (status ? `Delete failed (HTTP ${status})` : e?.message || "Delete failed"));
     }
   };
 
