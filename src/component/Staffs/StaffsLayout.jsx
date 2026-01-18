@@ -5,6 +5,7 @@ import StaffDashboard from "./Dashboard/StaffDashboard.jsx";
 import SemesterManagement from "./Semester/SemesterManagement.jsx";
 import StaffFinalResultPage from "./Final/StaffFinalResultPage.jsx";
 import ChatPage from "./Chat/ChatPage.jsx";
+import DocumentManager from "../Staffs/DocumentManage/DocumentManager.jsx";
 const { Sider, Content } = Layout;
 
 const StaffsLayout = () => {
@@ -27,6 +28,7 @@ const StaffsLayout = () => {
         {activeModule === "semester" && <SemesterManagement />}
         {activeModule === "final" && <StaffFinalResultPage />}
         {activeModule === "chat" && <ChatPage />}
+        {activeModule === "document" && <DocumentManager />}
       </div>
 
     </Layout>

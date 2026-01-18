@@ -7,7 +7,7 @@ import Profile from "./Profile/CompanyUpdatePage";
 import CompanyFinalReport from "./Evaluation/CompanyFinalReport";
 import DocumentManager from "./Document/DocumentManager";
 import StudentSearch from "./Students/StudentManage";
-import ApplicantManager from "./Applicants/ApplicantManager";
+import ApplicantManager from "./Applicants/JobApplicationManage";
 const { Sider, Content } = Layout;
 
 const CompanyRepLayout = () => {

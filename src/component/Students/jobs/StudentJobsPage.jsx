@@ -6,6 +6,8 @@ import jobDescriptionApi from "../../API/JobDescriptionAPI";
 import majorApi from "../../API/MajorAPI";
 import semesterApi from "../../API/SemesterAPI";
 import userApi from "../../API/UserAPI";
+import jobApplicationApi from "../../API/JobApplicationAPI";
+
 import "./StudentJobsPage.css";
 
 const safeParseJson = (value, fallback) => {
@@ -16,16 +18,21 @@ const safeParseJson = (value, fallback) => {
   }
 };
 
-const resolveStudentContext = () => {
-  const userInfo = safeParseJson(localStorage.getItem("userInfo") || "{}", {});
-  const authUser = safeParseJson(localStorage.getItem("authUser") || "{}", {});
+const resolveAuthContext = () => {
+  const authUserRaw = localStorage.getItem("authUser");
+  const authUser = safeParseJson(authUserRaw || "{}", {});
 
-  const userId = Number(userInfo?.userId ?? authUser?.id ?? authUser?.userId ?? 0) || 0;
-  const currentJobPositionId = Number(userInfo?.jobPositionId ?? authUser?.jobPositionId ?? 0) || 0;
-  const currentSemesterId = Number(userInfo?.semesterId ?? authUser?.semesterId ?? 0) || 0;
+  const userId =
+    Number(authUser?.id ?? authUser?.userId ?? 0) || 0;
 
-  return { userId, currentJobPositionId, currentSemesterId, userInfo, authUser };
+  console.log("[AUTH CONTEXT]");
+  console.log("raw authUser:", authUserRaw);
+  console.log("parsed authUser:", authUser);
+  console.log("resolved userId:", userId);
+
+  return { userId, authUser };
 };
+
 
 export default function StudentJobsPage() {
   const [messageApi, contextHolder] = message.useMessage();
@@ -116,58 +123,56 @@ export default function StudentJobsPage() {
   }, [rows, query, majorTitleById, semesterNameById, descriptionsByJobPositionId]);
 
   const handleApply = async (record) => {
-    const { userId, currentJobPositionId } = resolveStudentContext();
-    if (!userId) {
-      messageApi.warning("Please login first.");
-      return;
-    }
+  const { userId } = resolveAuthContext();
 
-    const jobPositionId = record?.jobPositionId;
-    const semesterId = record?.semesterId;
+  if (!userId) {
+    messageApi.warning("Please login first.");
+    console.warn("[APPLY] No userId found");
+    return;
+  }
 
-    const isSwitching = currentJobPositionId && currentJobPositionId !== jobPositionId;
+  const jobPositionId = record?.jobPositionId;
 
-    const ok = await new Promise((resolve) => {
-      Modal.confirm({
-        title: isSwitching ? "Change applied job?" : "Apply for this job?",
-        content: isSwitching
-          ? "You already applied to another job position. Applying here will replace your current selection."
-          : "Your profile will be updated with this job position.",
-        okText: "Apply",
-        cancelText: "Cancel",
-        onOk: () => resolve(true),
-        onCancel: () => resolve(false),
-      });
-    });
+  console.log("[APPLY CLICK]");
+  console.log("userId:", userId);
+  console.log("jobPositionId:", jobPositionId);
+  console.log("full record:", record);
 
-    if (!ok) return;
+  if (!jobPositionId) {
+    messageApi.error("Invalid job position.");
+    return;
+  }
 
-    try {
-      setApplyingId(jobPositionId);
-      await userApi.applyJobPosition({ userId, jobPositionId, semesterId });
+  try {
+    setApplyingId(jobPositionId);
 
-      // Keep localStorage in sync so other pages (e.g. FinalReport) see it immediately.
-      const ctx = resolveStudentContext();
-      const nextUserInfo = {
-        ...(ctx.userInfo || {}),
-        userId,
-        jobPositionId,
-        semesterId,
-      };
-      localStorage.setItem("userInfo", JSON.stringify(nextUserInfo));
+    const payload = {
+      userId,
+      jobPositionId,
+    };
 
-      messageApi.success("Applied successfully.");
-    } catch (err) {
-      console.error("Apply failed:", err);
-      messageApi.error(
-        err?.response?.data?.message ||
-          err?.response?.data ||
-          "Apply failed. Please try again."
-      );
-    } finally {
-      setApplyingId(null);
-    }
-  };
+    console.log("[JOB APPLICATION CREATE] payload:", payload);
+
+    const res = await jobApplicationApi.create(payload);
+
+    console.log("[JOB APPLICATION CREATE] response:", res);
+
+    messageApi.success("Apply job successfully 🎉");
+  } catch (err) {
+    console.error("[JOB APPLICATION CREATE] error:", err);
+    console.error("response data:", err?.response?.data);
+
+    messageApi.error(
+      err?.response?.data?.message ||
+        err?.response?.data ||
+        "Apply failed"
+    );
+  } finally {
+    setApplyingId(null);
+  }
+};
+
+
 
   const columns = [
     { title: "ID", dataIndex: "jobPositionId", key: "jobPositionId", width: 80 },
@@ -205,30 +210,26 @@ export default function StudentJobsPage() {
       },
     },
     {
-      title: "Actions",
-      key: "actions",
-      width: 160,
-      render: (_, record) => {
-        const { currentJobPositionId } = resolveStudentContext();
-        const isApplied = currentJobPositionId && currentJobPositionId === record.jobPositionId;
-        const disabled = !record?.isActive || applyingId === record.jobPositionId;
+  title: "Actions",
+  key: "actions",
+  width: 160,
+  render: (_, record) => {
+    const disabled =
+      !record?.isActive || applyingId === record.jobPositionId;
 
-        if (isApplied) {
-          return <Tag color="blue">Applied</Tag>;
-        }
+    return (
+      <Button
+        type="primary"
+        onClick={() => handleApply(record)}
+        loading={applyingId === record.jobPositionId}
+        disabled={disabled}
+      >
+        Apply
+      </Button>
+    );
+  },
+},
 
-        return (
-          <Button
-            type="primary"
-            onClick={() => handleApply(record)}
-            loading={applyingId === record.jobPositionId}
-            disabled={disabled}
-          >
-            Apply
-          </Button>
-        );
-      },
-    },
   ];
 
   return (
