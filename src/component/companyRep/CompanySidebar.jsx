@@ -7,7 +7,8 @@ import {
   FileText,
   FileStack,
   BookOpen,
-  User
+  User,
+  CalendarCheck
 } from "lucide-react";
 import "./CompanySidebar.css";
 
@@ -15,6 +16,7 @@ const CompanySidebar = ({ activeModule, setActiveModule }) => {
   const menuItems = [
     { id: "dashboard",     label: "Dashboard",          icon: <LayoutDashboard size={20} /> },
     { id: "jobs",          label: "Job Management",     icon: <Briefcase size={20} /> },
+    { id: "semester_company", label: "Semester Company", icon: <CalendarCheck size={20} /> },
     { id: "applicants",    label: "Applicants",         icon: <Users size={20} /> },
     { id: "documents",     label: "Company Documents",  icon: <FileStack size={20} /> },
     { id: "students",      label: "Students OJT",       icon: <BookOpen size={20} /> },

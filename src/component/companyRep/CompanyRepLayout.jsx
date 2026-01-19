@@ -8,6 +8,7 @@ import CompanyFinalReport from "./Evaluation/CompanyFinalReport";
 import DocumentManager from "./Document/DocumentManager";
 import StudentSearch from "./Students/StudentManage";
 import ApplicantManager from "./Applicants/JobApplicationManage";
+import SemesterCompanyPage from "./SemesterCompany/SemesterCompanyPage";
 const { Sider, Content } = Layout;
 
 const CompanyRepLayout = () => {
@@ -26,6 +27,7 @@ const CompanyRepLayout = () => {
       <div style={{ flex: 1, padding: "20px" }}>
         {activeModule === "dashboard" && <CompanyRepDashboard />}
         {activeModule === "jobs" && <div><JobManagement /></div>}
+        {activeModule === "semester_company" && <div><SemesterCompanyPage /></div>}
         {activeModule === "applicants" && <div>< ApplicantManager/></div>}
         {activeModule === "documents" && <div><DocumentManager /></div>}
         {activeModule === "students" && <div><StudentSearch /></div>}

@@ -3,6 +3,23 @@ import companySemesterApi from "../../API/CompanySemesterAPI";
 import companyApi from "../../API/CompanyAPI";
 import "./CompanyManagement.scss";
 
+const isDebugEnabled = () => {
+  try {
+    return (
+      process.env.NODE_ENV !== "production" ||
+      localStorage.getItem("debug_semester_company") === "1"
+    );
+  } catch (_) {
+    return process.env.NODE_ENV !== "production";
+  }
+};
+
+const debugLog = (...args) => {
+  if (!isDebugEnabled()) return;
+  // eslint-disable-next-line no-console
+  console.log("[Staff SemesterCompany]", ...args);
+};
+
 export default function CompanyManagement() {
   const [companies, setCompanies] = useState([]);
   const [companyMap, setCompanyMap] = useState({});
@@ -27,8 +44,14 @@ export default function CompanyManagement() {
       console.log("[CompanyMap]", map);
 
       setCompanyMap(map);
+      debugLog("Loaded companyMap", { count: Object.keys(map).length });
     } catch (err) {
       console.error("Failed to fetch companies", err);
+      debugLog("fetchCompanyMap error", {
+        status: err?.response?.status,
+        data: err?.response?.data,
+        message: err?.message,
+      });
       setCompanyMap({});
     }
   };
@@ -46,8 +69,14 @@ export default function CompanyManagement() {
         : res.data?.data || [];
 
       setCompanies(list);
+      debugLog("Loaded semester-company list", { count: list.length });
     } catch (err) {
       console.error("Failed to fetch semester companies", err);
+      debugLog("fetchCompanies error", {
+        status: err?.response?.status,
+        data: err?.response?.data,
+        message: err?.message,
+      });
       setCompanies([]);
     } finally {
       setLoading(false);
@@ -70,13 +99,21 @@ export default function CompanyManagement() {
     };
 
     console.log("[Approve payload]", payload);
+    debugLog("Approve click", { item, payload });
 
     // ✅ chỉ truyền payload
     await companySemesterApi.approve(payload);
 
+    debugLog("Approve success", payload);
+
     fetchCompanies();
   } catch (err) {
     console.error("Approve failed", err);
+    debugLog("Approve failed", {
+      status: err?.response?.status,
+      data: err?.response?.data,
+      message: err?.message,
+    });
   }
 };
 
@@ -95,7 +132,7 @@ export default function CompanyManagement() {
 
   return (
     <div className="company-management">
-      <h1>Company Management</h1>
+      <h1>Semester Company Management</h1>
 
       {loading ? (
         <p>Loading...</p>

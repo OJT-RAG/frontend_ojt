@@ -9,7 +9,7 @@ import "./StaffSidebar.css";
 const StaffSidebar = ({ activeModule, setActiveModule }) => {
   const menuItems = [
     { id: "dashboard", label: "Dashboard", icon: <LayoutDashboard size={20} /> },
-    { id: "company", label: "Company", icon: <CalendarRange size={20} /> },
+    { id: "company", label: "Semester Company", icon: <CalendarRange size={20} /> },
     { id: "final", label: "Final Report", icon: <CalendarRange size={20} /> },
     { id: "chat", label: "Chat", icon: <CalendarRange size={20} /> },
     { id: "document", label: "Documentation", icon: <CalendarRange size={20} /> },

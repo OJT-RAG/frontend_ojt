@@ -10,6 +10,23 @@ import companyApi from "../../API/CompanyAPI";
 import companySemesterApi from "../../API/CompanySemesterAPI";
 import "./JobManagement.css";
 
+const isDebugEnabled = () => {
+  try {
+    return (
+      process.env.NODE_ENV !== "production" ||
+      localStorage.getItem("debug_semester_company") === "1"
+    );
+  } catch (_) {
+    return process.env.NODE_ENV !== "production";
+  }
+};
+
+const debugLog = (...args) => {
+  if (!isDebugEnabled()) return;
+  // eslint-disable-next-line no-console
+  console.log("[JobManagement]", ...args);
+};
+
 const JobManagement = () => {
   const [jobs, setJobs] = useState([]);
   const [filtered, setFiltered] = useState([]);
@@ -84,6 +101,8 @@ const JobManagement = () => {
     sc?.company?.companyId ??
     sc?.company?.company_ID;
 
+  const isApprovedSemesterCompany = (sc) => Boolean(sc?.approvedAt);
+
   const getCompanyIdFromStorage = () => {
     const raw = localStorage.getItem("company_id");
     const parsed = Number(raw);
@@ -98,10 +117,11 @@ const JobManagement = () => {
       const scCompanyId = resolveCompanyId(sc);
       const matchSemester = semesterId ? scSemesterId === semesterId : true;
       const matchCompany = companyId ? scCompanyId === companyId : true;
-      return matchSemester && matchCompany;
+      const approved = isApprovedSemesterCompany(sc);
+      return matchSemester && matchCompany && approved;
     });
 
-    return filtered.length ? filtered : semesterCompanies;
+    return filtered;
   };
 
   const inferSemesterCompanyId = (semesterId) => {
@@ -115,13 +135,38 @@ const JobManagement = () => {
 
   const fetchSemesterCompanies = async () => {
     try {
-      const res = await companySemesterApi.getAll();
+      const companyId = getCompanyIdFromStorage();
+      debugLog("fetchSemesterCompanies()", { companyId });
+      const res = companyId ? await companySemesterApi.getByCompany(companyId) : await companySemesterApi.getAll();
       const list = res?.data?.data || res?.data || [];
       setSemesterCompanies(list);
+      debugLog("Loaded semesterCompanies", { count: list.length, list });
     } catch (err) {
       console.error("Failed to fetch semester companies:", err);
+      debugLog("fetchSemesterCompanies() error", {
+        status: err?.response?.status,
+        data: err?.response?.data,
+        message: err?.message,
+      });
     }
   };
+
+  const activeSemesterId = useMemo(() => {
+    const active = semesters.find((s) => s.isActive === true) || semesters[0];
+    return active?.semesterId ?? active?.semesterID ?? null;
+  }, [semesters]);
+
+  const canManageJobPositionsForActiveSemester = useMemo(() => {
+    const companyId = getCompanyIdFromStorage();
+    if (!companyId || !activeSemesterId) return false;
+    const ok = semesterCompanies.some((sc) => {
+      const scSemesterId = resolveSemesterId(sc);
+      const scCompanyId = resolveCompanyId(sc);
+      return scSemesterId === activeSemesterId && scCompanyId === companyId && isApprovedSemesterCompany(sc);
+    });
+    debugLog("Approval gate computed", { companyId, activeSemesterId, ok });
+    return ok;
+  }, [semesterCompanies, activeSemesterId]);
 
   const fetchJobPositions = async () => {
     try {
@@ -273,6 +318,11 @@ const JobManagement = () => {
   };
 
   const openCreatePositionModal = () => {
+    if (!canManageJobPositionsForActiveSemester) {
+      messageApi.warning("Company chưa được duyệt vào học kỳ đang hoạt động. Hãy vào Semester Company để gửi yêu cầu và chờ duyệt.");
+      debugLog("openCreatePositionModal blocked", { activeSemesterId });
+      return;
+    }
     setEditPosition(null);
     positionForm.resetFields();
     const activeSemester = semesters.find((s) => s.isActive === true) || semesters[0];
@@ -305,7 +355,14 @@ const JobManagement = () => {
   const handleSubmitPosition = async () => {
     let payloadForDebug = null;
     try {
+      if (!canManageJobPositionsForActiveSemester) {
+        messageApi.error("Không thể tạo/cập nhật Job Position: company chưa được duyệt vào học kỳ đang hoạt động");
+        debugLog("handleSubmitPosition blocked", { activeSemesterId });
+        return;
+      }
+
       const values = await positionForm.validateFields();
+      debugLog("handleSubmitPosition values", values);
 
       const selectedJob = jobs.find((j) => j.jobTitleId === values.jobTitleId);
       if (!selectedJob) {
@@ -326,6 +383,7 @@ const JobManagement = () => {
       delete payload.jobTitleId;
 
       payloadForDebug = payload;
+      debugLog("handleSubmitPosition payload", payload);
 
       if (!payload.semesterId) {
         messageApi.error("Missing semesterId: please select a semester");
@@ -334,6 +392,18 @@ const JobManagement = () => {
 
       if (!payload.semesterCompanyId) {
         messageApi.error("Missing semesterCompanyId: please select semester-company");
+        return;
+      }
+
+      const allowedSemesterCompanyIds = new Set(
+        getSemesterCompanyOptions(payload.semesterId).map((sc) => resolveSemesterCompanyId(sc))
+      );
+      if (!allowedSemesterCompanyIds.has(payload.semesterCompanyId)) {
+        messageApi.error("Semester Company chưa được duyệt hoặc không thuộc company hiện tại");
+        debugLog("semesterCompanyId not allowed", {
+          semesterCompanyId: payload.semesterCompanyId,
+          allowed: Array.from(allowedSemesterCompanyIds),
+        });
         return;
       }
 
@@ -772,6 +842,7 @@ const JobManagement = () => {
                         type="primary"
                         icon={<Plus size={16} />}
                         onClick={openCreatePositionModal}
+                        disabled={!canManageJobPositionsForActiveSemester}
                       >
                         Create
                       </Button>
