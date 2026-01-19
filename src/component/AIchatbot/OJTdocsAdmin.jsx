@@ -4,6 +4,52 @@ import "toastify-js/src/toastify.css";
 import "./OJTdocsAdmin.scss";
 
 const DEFAULT_RAG_BASE = "https://ojt-rag-python.onrender.com";
+const RAGDOCS_URL_MAP_KEY = "ragdocs_import_url_map_v1";
+
+const isProbablyUrl = (value) => {
+	if (typeof value !== "string") return false;
+	const v = value.trim().toLowerCase();
+	return v.startsWith("http://") || v.startsWith("https://");
+};
+
+const loadImportUrlMap = () => {
+	try {
+		const raw = localStorage.getItem(RAGDOCS_URL_MAP_KEY);
+		if (!raw) return [];
+		const parsed = JSON.parse(raw);
+		return Array.isArray(parsed) ? parsed : [];
+	} catch {
+		return [];
+	}
+};
+
+const saveImportUrlMap = (list) => {
+	try {
+		localStorage.setItem(RAGDOCS_URL_MAP_KEY, JSON.stringify(list));
+	} catch {
+		// ignore
+	}
+};
+
+const rememberImportUrl = ({ label, url }) => {
+	const safeLabel = typeof label === "string" ? label.trim() : "";
+	const safeUrl = typeof url === "string" ? url.trim() : "";
+	if (!safeLabel || !safeUrl) return;
+	const current = loadImportUrlMap();
+	const next = [
+		{ label: safeLabel, url: safeUrl, savedAt: Date.now() },
+		...current.filter((x) => x?.label !== safeLabel),
+	].slice(0, 200);
+	saveImportUrlMap(next);
+};
+
+const findImportUrlForLabel = (label) => {
+	const safeLabel = typeof label === "string" ? label.trim() : "";
+	if (!safeLabel) return "";
+	const current = loadImportUrlMap();
+	const hit = current.find((x) => x?.label === safeLabel && typeof x?.url === "string");
+	return hit?.url?.trim() || "";
+};
 
 const sanitizeBaseUrl = (value) => {
 	if (!value || typeof value !== "string") return "";
@@ -15,7 +61,7 @@ const normalizeFileEntry = (entry) => {
 	if (entry == null) return { key: "file-null", resourceName: "", label: "" };
 	if (typeof entry === "string") {
 		const v = entry.trim();
-		return { key: v || "file", resourceName: v, label: v };
+		return { key: v || "file", resourceName: v, label: v, rawResourceName: v };
 	}
 	if (typeof entry === "object") {
 		const displayName =
@@ -30,14 +76,39 @@ const normalizeFileEntry = (entry) => {
 				: typeof entry.resourceName === "string"
 				? entry.resourceName
 				: "";
+		const urlCandidate =
+			typeof entry.url === "string"
+				? entry.url
+				: typeof entry.source_url === "string"
+				? entry.source_url
+				: typeof entry.sourceUrl === "string"
+				? entry.sourceUrl
+				: "";
 
 		const label = displayName || resourceName || "(unknown file)";
 		const key = resourceName || displayName || JSON.stringify(entry);
-		return { key, resourceName, label, raw: entry };
+		return {
+			key,
+			resourceName,
+			rawResourceName: resourceName,
+			label,
+			url: urlCandidate,
+			raw: entry,
+		};
 	}
 
 	const fallback = String(entry);
-	return { key: fallback, gcsUri: fallback, label: fallback };
+	return { key: fallback, resourceName: fallback, label: fallback };
+};
+
+const extractApiMessage = (payload, textFallback, defaultMessage) => {
+	if (typeof payload === "string" && payload.trim()) return payload.trim();
+	if (payload && typeof payload === "object") {
+		const msg = payload?.message || payload?.detail || payload?.status;
+		if (typeof msg === "string" && msg.trim()) return msg.trim();
+	}
+	if (typeof textFallback === "string" && textFallback.trim()) return textFallback.trim();
+	return defaultMessage;
 };
 
 const OJTdocsAdmin = () => {
@@ -87,7 +158,18 @@ const OJTdocsAdmin = () => {
 				: [];
 			setRawFiles(list);
 
-			const normalized = list.map((entry) => normalizeFileEntry(entry));
+			const normalized = list.map((entry) => {
+				const file = normalizeFileEntry(entry);
+				const urlFromApi = typeof file.url === "string" ? file.url.trim() : "";
+				const mappedUrl = findImportUrlForLabel(file.label);
+				const deleteKey =
+					(urlFromApi && isProbablyUrl(urlFromApi))
+						? urlFromApi
+						: (mappedUrl && isProbablyUrl(mappedUrl))
+						? mappedUrl
+						: file.resourceName;
+				return { ...file, deleteKey, mappedUrl };
+			});
 			console.groupCollapsed("[RAGdocs] /list_files response");
 			console.log({ url: `${baseUrl}/list_files`, count: list.length, sample: list[0] });
 			console.log("raw files:", list);
@@ -104,14 +186,15 @@ const OJTdocsAdmin = () => {
 
 	const handleImport = async (event) => {
 		event.preventDefault();
-		if (!urlInput.trim()) {
+		const inputUrl = urlInput.trim();
+		if (!inputUrl) {
 			setError("Vui lòng nhập URL");
 			return;
 		}
 		setImporting(true);
 		setError("");
 		try {
-			const url = `${baseUrl}/import_pdf?url=${encodeURIComponent(urlInput.trim())}`;
+			const url = `${baseUrl}/import_pdf?url=${encodeURIComponent(inputUrl)}`;
 			const res = await fetch(url, { method: "POST" });
 			const text = await res.text();
 			let payload = null;
@@ -127,6 +210,10 @@ const OJTdocsAdmin = () => {
 			console.groupCollapsed("[RAGdocs] /import_pdf response");
 			console.log({ url, status: res.status, payload: payload ?? text });
 			console.groupEnd();
+			const title = typeof payload?.title === "string" ? payload.title.trim() : "";
+			if (title) {
+				rememberImportUrl({ label: title, url: inputUrl });
+			}
 			setUrlInput("");
 			await loadFiles();
 			const successText =
@@ -151,17 +238,43 @@ const OJTdocsAdmin = () => {
 	};
 
 	const handleDelete = async (file) => {
-		const resourceName = typeof file === "string" ? file : file?.resourceName;
-		if (!resourceName) {
+		let deleteKey =
+			typeof file === "string"
+				? file
+				: typeof file?.deleteKey === "string"
+				? file.deleteKey
+				: file?.resourceName;
+		deleteKey = typeof deleteKey === "string" ? deleteKey.trim() : "";
+		if (!deleteKey) {
 			console.error("Delete failed: missing resource_name", file);
 			setError("Missing resource_name for delete");
 			return;
 		}
-		setDeleting(resourceName);
+
+		// If we don't know the original URL yet, ask once and remember it.
+		if (!isProbablyUrl(deleteKey) && typeof file === "object" && file?.label) {
+			const maybeUrl = window.prompt(
+				"Không tìm thấy link gốc để xóa. Dán URL Google Drive đã dùng để import (sẽ lưu lại để lần sau bấm Delete không cần nhập):",
+				""
+			);
+			if (typeof maybeUrl === "string" && maybeUrl.trim() && isProbablyUrl(maybeUrl)) {
+				rememberImportUrl({ label: file.label, url: maybeUrl.trim() });
+				deleteKey = maybeUrl.trim();
+			}
+		}
+
+		const ok = window.confirm(`Delete this file?\n\n${deleteKey}`);
+		if (!ok) return;
+		setDeleting(deleteKey);
 		setError("");
 		try {
-			const url = `${baseUrl}/delete_file?resource_name=${encodeURIComponent(resourceName)}`;
-			const res = await fetch(url, { method: "DELETE" });
+			const url = `${baseUrl}/delete_file?resource_name=${encodeURIComponent(deleteKey)}`;
+			const res = await fetch(url, {
+				method: "DELETE",
+				headers: {
+					Accept: "application/json",
+				},
+			});
 			const text = await res.text();
 			let payload = null;
 			try {
@@ -171,12 +284,24 @@ const OJTdocsAdmin = () => {
 			}
 			if (!res.ok) {
 				console.error("Delete failed", res.status, res.statusText, text);
-				throw new Error(text || `HTTP ${res.status}`);
+				throw new Error(extractApiMessage(payload, text, `HTTP ${res.status}`));
 			}
 			console.groupCollapsed("[RAGdocs] /delete_file response");
 			console.log({ url, status: res.status, payload: payload ?? text });
 			console.groupEnd();
 			await loadFiles();
+			Toastify({
+				text: extractApiMessage(payload, text, "Delete thành công"),
+				duration: 1000,
+				gravity: "top",
+				position: "right",
+				close: true,
+				style: {
+					background: "#dc2626",
+					color: "#fff",
+					fontWeight: "700",
+				},
+			}).showToast();
 		} catch (err) {
 			setError(err.message || "Failed to delete file");
 		} finally {
@@ -241,15 +366,22 @@ const OJTdocsAdmin = () => {
 								{files.map((file) => (
 									<tr key={file.key}>
 										<td>
-											<code className="code-chip">{file.label}</code>
+											<div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+												<code className="code-chip">{file.label}</code>
+												{typeof file.deleteKey === "string" && file.deleteKey.trim() && (
+													<div className="muted" style={{ wordBreak: "break-all" }}>
+														Delete key: <code>{file.deleteKey}</code>
+													</div>
+												)}
+											</div>
 										</td>
 										<td>
 											<button
 												className="btn danger"
 												onClick={() => handleDelete(file)}
-												disabled={deleting === file.resourceName}
+												disabled={deleting === file.deleteKey}
 											>
-												{deleting === file.resourceName ? "Deleting..." : "Delete"}
+												{deleting === file.deleteKey ? "Deleting..." : "Delete"}
 											</button>
 										</td>
 									</tr>
@@ -263,7 +395,7 @@ const OJTdocsAdmin = () => {
 					<div className="card-header">
 						<div>
 							<h3>Import tài liệu</h3>
-							<p className="muted">Dán link (gcs_uri) để RAG index PDF/docs.</p>
+							<p className="muted">Dán URL để RAG index PDF/docs.</p>
 						</div>
 					</div>
 

@@ -15,7 +15,6 @@ import Header from './component/homepage/Header';
 import AdminDashboard from './component/Admin/AdminDashboard';
 import CompanyRepLayout from './component/companyRep/CompanyRepLayout';
 import AIChat from './component/Students/dashboard/ChatQA/ChatPage.jsx';
-import OJTdocsAdmin from './component/AIchatbot/OJTdocsAdmin.jsx';
 import StaffsLayout from './component/Staffs/StaffsLayout.jsx';
 import Footer from './component/homepage/Footer.jsx';
 import Staffchat from './component/AIchatbot/chat/StaffChatPage.jsx';
@@ -57,14 +56,6 @@ function App() {
         <Route path="/jobs" element={<JobList />} />
         <Route path="/jobs/:id" element={<JobDetail />} />
         <Route path="/ojt" element={<OJT />} />
-        <Route
-          path="/ragdocs"
-          element={
-            <RequireAuth allowedRoles={["admin", "cro_staff"]}>
-              <OJTdocsAdmin />
-            </RequireAuth>
-          }
-        />
         <Route path="/student" element={<Student />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/company/*" element={<CompanyRepLayout />} />
