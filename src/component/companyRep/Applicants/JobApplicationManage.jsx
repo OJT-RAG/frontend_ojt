@@ -1,25 +1,129 @@
 import React, { useEffect, useState } from "react";
 import jobApplicationApi from "../../API/JobApplicationAPI";
+import jobPositionApi from "../../API/JobPositionAPI";
+import companySemesterApi from "../../API/CompanySemesterAPI";
 import "./JobApplicationManage.scss";
+
+const isDebugEnabled = () => {
+  try {
+    return (
+      process.env.NODE_ENV !== "production" ||
+      localStorage.getItem("debug_semester_company") === "1"
+    );
+  } catch (_) {
+    return process.env.NODE_ENV !== "production";
+  }
+};
+
+const debugLog = (...args) => {
+  if (!isDebugEnabled()) return;
+  // eslint-disable-next-line no-console
+  console.log("[Company Applicants]", ...args);
+};
+
+const getCompanyIdFromStorage = () => {
+  const raw = localStorage.getItem("company_id");
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const resolveSemesterCompanyId = (sc) =>
+  sc?.semesterCompanyId ?? sc?.semesterCompanyID ?? sc?.id ?? sc?.Id;
+
+const resolveCompanyId = (sc) =>
+  sc?.companyId ??
+  sc?.companyID ??
+  sc?.company_ID ??
+  sc?.company?.companyId ??
+  sc?.company?.company_ID;
+
+const resolveJobPositionId = (jp) =>
+  jp?.jobPositionId ?? jp?.jobPositionID ?? jp?.jobPositionid;
+
+const resolveJobPositionCompanyId = (jp) =>
+  jp?.companyId ?? jp?.companyID ?? jp?.company_ID ?? jp?.company_id ?? jp?.company?.companyId;
+
+const resolveJobPositionSemesterCompanyId = (jp) =>
+  jp?.semesterCompanyId ?? jp?.semesterCompanyID ?? jp?.semesterCompanyid;
 
 export default function JobApplicationManage() {
   const [applications, setApplications] = useState([]);
   const [rejectReason, setRejectReason] = useState("");
   const [rejectingId, setRejectingId] = useState(null);
+  const [jobTitleByJobPositionId, setJobTitleByJobPositionId] = useState({});
 
   const fetchApplications = async () => {
-  try {
-    const res = await jobApplicationApi.getAll();
+    try {
+      const companyId = getCompanyIdFromStorage();
+      debugLog("fetchApplications() start", { companyId });
 
-    const pendingApps = (res.data.data || []).filter(
-      (app) => app.status === "pending"
-    );
+      if (!companyId) {
+        debugLog("Missing company_id in localStorage; hide all applications for safety");
+        setApplications([]);
+        setJobTitleByJobPositionId({});
+        return;
+      }
 
-    setApplications(pendingApps);
-  } catch (err) {
-    console.error("Fetch job applications failed", err);
-  }
-};
+      const [appRes, jobPosRes, scRes] = await Promise.all([
+        jobApplicationApi.getAll(),
+        jobPositionApi.getAll(),
+        companySemesterApi.getByCompany(companyId).catch(() => ({ data: { data: [] } })),
+      ]);
+
+      const apps = appRes?.data?.data || [];
+      const jobPositions = jobPosRes?.data?.data || [];
+      const semesterCompanies = scRes?.data?.data || scRes?.data || [];
+
+      const scCompanyIdByScId = new Map();
+      for (const sc of semesterCompanies) {
+        const scId = resolveSemesterCompanyId(sc);
+        const scCompanyId = resolveCompanyId(sc);
+        if (scId != null && scCompanyId != null) scCompanyIdByScId.set(scId, scCompanyId);
+      }
+
+      const allowedJobPositionIds = new Set();
+      const titleMap = {};
+      for (const jp of jobPositions) {
+        const jpId = resolveJobPositionId(jp);
+        if (jpId == null) continue;
+
+        titleMap[jpId] = jp?.jobTitle || titleMap[jpId] || "";
+
+        const directCompanyId = resolveJobPositionCompanyId(jp);
+        if (directCompanyId != null) {
+          if (directCompanyId === companyId) allowedJobPositionIds.add(jpId);
+          continue;
+        }
+
+        const scId = resolveJobPositionSemesterCompanyId(jp);
+        if (scId != null) {
+          const mappedCompanyId = scCompanyIdByScId.get(scId);
+          if (mappedCompanyId === companyId) allowedJobPositionIds.add(jpId);
+        }
+      }
+
+      const visible = apps.filter((app) => allowedJobPositionIds.has(app.jobPositionId));
+      const pendingApps = visible.filter((app) => app.status === "pending");
+
+      debugLog("filter result", {
+        appsTotal: apps.length,
+        jobPositionsTotal: jobPositions.length,
+        allowedJobPositionIds: allowedJobPositionIds.size,
+        visible: visible.length,
+        pending: pendingApps.length,
+      });
+
+      setJobTitleByJobPositionId(titleMap);
+      setApplications(pendingApps);
+    } catch (err) {
+      console.error("Fetch job applications failed", err);
+      debugLog("fetchApplications() error", {
+        status: err?.response?.status,
+        data: err?.response?.data,
+        message: err?.message,
+      });
+    }
+  };
 
 
   useEffect(() => {
@@ -83,7 +187,12 @@ export default function JobApplicationManage() {
             <tr key={app.jobApplicationId}>
               <td>{app.jobApplicationId}</td>
               <td>{app.userId}</td>
-              <td>{app.jobPositionId}</td>
+              <td>
+                {app.jobPositionId}
+                {jobTitleByJobPositionId[app.jobPositionId]
+                  ? ` - ${jobTitleByJobPositionId[app.jobPositionId]}`
+                  : ""}
+              </td>
               <td className={`status ${app.status}`}>{app.status}</td>
               <td>{new Date(app.appliedAt).toLocaleString()}</td>
 
