@@ -2,7 +2,7 @@ import React, { useState } from "react";
 import { Layout } from "antd";
 import StaffSidebar from "./StaffSidebar.jsx";
 import StaffDashboard from "./Dashboard/StaffDashboard.jsx";
-import SemesterManagement from "./Semester/SemesterManagement.jsx";
+import CompanyManagement from "./Company/CompanyManagement.jsx";
 import StaffFinalResultPage from "./Final/StaffFinalResultPage.jsx";
 import ChatPage from "./Chat/ChatPage.jsx";
 import DocumentManager from "../Staffs/DocumentManage/DocumentManager.jsx";
@@ -25,7 +25,7 @@ const StaffsLayout = () => {
       {/* MAIN CONTENT */}
       <div style={{ flex: 1, padding: "20px" }}>
         {activeModule === "dashboard" && <StaffDashboard />}
-        {activeModule === "semester" && <SemesterManagement />}
+        {activeModule === "company" && <CompanyManagement />}
         {activeModule === "final" && <StaffFinalResultPage />}
         {activeModule === "chat" && <ChatPage />}
         {activeModule === "document" && <DocumentManager />}

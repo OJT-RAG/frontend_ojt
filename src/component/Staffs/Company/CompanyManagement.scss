@@ -1,0 +1,96 @@
+.company-management {
+  padding: 24px;
+
+  h1 {
+    margin-bottom: 20px;
+    color: #222;
+  }
+}
+
+.company-table {
+  width: 100%;
+  border-collapse: collapse;
+  background: #fff;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+
+  th,
+  td {
+    padding: 12px 14px;
+    text-align: left;
+    border-bottom: 1px solid #eee;
+  }
+
+  th {
+    background: #f6f7fb;
+    font-weight: 600;
+    color: #333;
+  }
+
+  tr:hover {
+    background: #fafafa;
+  }
+
+  .empty {
+    text-align: center;
+    color: #999;
+    padding: 20px;
+  }
+}
+
+.actions {
+  display: flex;
+  gap: 8px;
+
+  button {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: none;
+    cursor: pointer;
+    font-size: 14px;
+  }
+
+  .approve {
+    background: #2ecc71;
+    color: #fff;
+
+    &:hover {
+      background: #27ae60;
+    }
+  }
+
+  .delete {
+    background: #e74c3c;
+    color: #fff;
+
+    &:hover {
+      background: #c0392b;
+    }
+  }
+}
+
+.company-cell {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+
+  img {
+    width: 42px;
+    height: 42px;
+    object-fit: contain;
+    border-radius: 6px;
+    border: 1px solid #eee;
+    background: #fff;
+  }
+
+  .name {
+    font-weight: 600;
+    color: #333;
+  }
+
+  .email {
+    font-size: 13px;
+    color: #777;
+  }
+}
