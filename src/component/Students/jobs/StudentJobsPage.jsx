@@ -1,11 +1,10 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Button, Input, Table, Tag, message, Modal } from "antd";
+import { Button, Input, Table, Tag, message } from "antd";
 import { Bookmark, BookmarkCheck, RefreshCcw, Search } from "lucide-react";
 import jobPositionApi from "../../API/JobPositionAPI";
 import jobDescriptionApi from "../../API/JobDescriptionAPI";
 import majorApi from "../../API/MajorAPI";
 import semesterApi from "../../API/SemesterAPI";
-import userApi from "../../API/UserAPI";
 import jobApplicationApi from "../../API/JobApplicationAPI";
 import jobBookmarkApi from "../../API/JobBookmarkAPI";
 
@@ -48,6 +47,9 @@ export default function StudentJobsPage() {
 
   const [applyingId, setApplyingId] = useState(null);
 
+  const [applicationByJobPositionId, setApplicationByJobPositionId] = useState({});
+  const [applicationsLoading, setApplicationsLoading] = useState(false);
+
   const [bookmarkByJobPositionId, setBookmarkByJobPositionId] = useState({});
   const [bookmarkBusyId, setBookmarkBusyId] = useState(null);
   const [showBookmarkedOnly, setShowBookmarkedOnly] = useState(false);
@@ -70,6 +72,40 @@ export default function StudentJobsPage() {
       }
     }
     setBookmarkByJobPositionId(map);
+  };
+
+  const loadApplications = async () => {
+    const { userId } = resolveAuthContext();
+    if (!userId) {
+      setApplicationByJobPositionId({});
+      return;
+    }
+
+    setApplicationsLoading(true);
+    try {
+      const res = await jobApplicationApi.getAll();
+      const list = res?.data?.data || [];
+
+      const map = {};
+      for (const a of list) {
+        if (Number(a?.userId) !== Number(userId)) continue;
+        const jobPositionId = a?.jobPositionId;
+        if (!jobPositionId) continue;
+        // Keep the latest by updateAt/appliedAt when available
+        const prev = map[jobPositionId];
+        if (!prev) {
+          map[jobPositionId] = a;
+          continue;
+        }
+        const prevTime = new Date(prev?.updateAt || prev?.appliedAt || prev?.createAt || 0).getTime();
+        const nextTime = new Date(a?.updateAt || a?.appliedAt || a?.createAt || 0).getTime();
+        if (nextTime >= prevTime) map[jobPositionId] = a;
+      }
+
+      setApplicationByJobPositionId(map);
+    } finally {
+      setApplicationsLoading(false);
+    }
   };
 
   const refresh = async () => {
@@ -102,6 +138,13 @@ export default function StudentJobsPage() {
         await loadBookmarks();
       } catch (bookmarkErr) {
         console.warn("Failed to load bookmarks:", bookmarkErr);
+      }
+
+      // Load job applications for current user (best-effort)
+      try {
+        await loadApplications();
+      } catch (appErr) {
+        console.warn("Failed to load applications:", appErr);
       }
     } catch (err) {
       console.error("Failed to fetch job positions:", err);
@@ -222,6 +265,12 @@ export default function StudentJobsPage() {
 
   const jobPositionId = record?.jobPositionId;
 
+  const existing = applicationByJobPositionId[jobPositionId];
+  if (existing?.status) {
+    messageApi.info(`You already applied (${existing.status}).`);
+    return;
+  }
+
   console.log("[APPLY CLICK]");
   console.log("userId:", userId);
   console.log("jobPositionId:", jobPositionId);
@@ -246,7 +295,17 @@ export default function StudentJobsPage() {
 
     console.log("[JOB APPLICATION CREATE] response:", res);
 
-    messageApi.success("Apply job successfully 🎉");
+    // Backend typically creates with status=pending
+    setApplicationByJobPositionId((prev) => ({
+      ...prev,
+      [jobPositionId]: res?.data?.data || { userId, jobPositionId, status: "pending" },
+    }));
+    messageApi.success("Applied successfully");
+
+    // Refresh from server (best-effort) to sync status
+    try {
+      await loadApplications();
+    } catch {}
   } catch (err) {
     console.error("[JOB APPLICATION CREATE] error:", err);
     console.error("response data:", err?.response?.data);
@@ -260,6 +319,14 @@ export default function StudentJobsPage() {
     setApplyingId(null);
   }
 };
+
+  const statusColor = (status) => {
+    const s = String(status || "").toLowerCase();
+    if (s === "accepted") return "green";
+    if (s === "rejected") return "red";
+    if (s === "pending") return "gold";
+    return "default";
+  };
 
 
 
@@ -322,18 +389,27 @@ export default function StudentJobsPage() {
   key: "actions",
   width: 160,
   render: (_, record) => {
+    const app = applicationByJobPositionId[record?.jobPositionId];
+    const status = app?.status;
     const disabled =
-      !record?.isActive || applyingId === record.jobPositionId;
+      !record?.isActive || applyingId === record.jobPositionId || !!status;
 
     return (
-      <Button
-        type="primary"
-        onClick={() => handleApply(record)}
-        loading={applyingId === record.jobPositionId}
-        disabled={disabled}
-      >
-        Apply
-      </Button>
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        {status ? (
+          <Tag color={statusColor(status)} style={{ marginInlineEnd: 0 }}>
+            {String(status).toUpperCase()}
+          </Tag>
+        ) : null}
+        <Button
+          type="primary"
+          onClick={() => handleApply(record)}
+          loading={applyingId === record.jobPositionId}
+          disabled={disabled}
+        >
+          {status ? "Applied" : "Apply"}
+        </Button>
+      </div>
     );
   },
 },
@@ -371,7 +447,7 @@ export default function StudentJobsPage() {
         rowKey={(r) => r.jobPositionId}
         columns={columns}
         dataSource={filteredRows}
-        loading={loading}
+        loading={loading || applicationsLoading}
         pagination={{ pageSize: 8, showSizeChanger: true }}
       />
     </div>
