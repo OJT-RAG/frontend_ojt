@@ -12,6 +12,12 @@ const companySemesterApi = {
   // ✅ Lấy 1 company – semester theo id
   getById: (id) =>
     httpClient.get(`/semester-company/${id}`),
+   approve: (data) =>
+    httpClient.put("/semester-company/update", data),
+
+  // ✅ Delete company khỏi semester
+  delete: (id) =>
+    httpClient.delete(`/semester-company/delete/${id}`),
 };
 
 export default companySemesterApi;
