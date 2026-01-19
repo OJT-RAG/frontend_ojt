@@ -1,12 +1,16 @@
 import React, { useState, useEffect } from "react";
-import { Form, Input, Button, DatePicker, message } from "antd";
+import { Form, Input, Button, DatePicker, Upload, message } from "antd";
+import { useNavigate } from "react-router-dom";
 import moment from "moment";
 import userApi from "../../API/UserAPI";
 import "./UpdateUserProfile.css";
 
 const UpdateUserPage = ({ userId = 0 }) => {
   const [form] = Form.useForm();
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
+  const [avatarFileList, setAvatarFileList] = useState([]);
+  const [cvFileList, setCvFileList] = useState([]);
 
   const resolvedUserId = React.useMemo(() => {
     if (userId && Number(userId) > 0) return Number(userId);
@@ -31,6 +35,8 @@ const UpdateUserPage = ({ userId = 0 }) => {
         const data = res?.data?.data ?? res?.data ?? {};
         form.setFieldsValue({
           ...data,
+          majorId: data?.majorId ?? "",
+          companyId: data?.companyId ?? "",
           dob: data?.dob ? moment(data.dob) : null,
         });
       } catch (error) {
@@ -47,19 +53,35 @@ const UpdateUserPage = ({ userId = 0 }) => {
     try {
       const fd = new FormData();
       const userIdValue = values.userId ?? resolvedUserId;
-      fd.append('UserId', String(userIdValue || ''));
-      fd.append('StudentCode', values.studentCode ?? '');
-      fd.append('Phone', values.phone ?? '');
-      fd.append('MajorId', values.majorId ?? '');
-      fd.append('AvatarUrl', values.avatarUrl ?? '');
-      fd.append('Dob', values.dob ? values.dob.format('YYYY-MM-DD') : '');
-      fd.append('CompanyId', values.companyId ?? '');
-      fd.append('Fullname', values.fullname ?? '');
-      fd.append('Password', values.password ?? '');
-      fd.append('CvUrl', values.cvUrl ?? '');
+      fd.append("UserId", String(userIdValue || ""));
+      fd.append("StudentCode", values.studentCode ?? "");
+      fd.append("Phone", values.phone ?? "");
+      fd.append(
+        "MajorId",
+        values.majorId === 0 || values.majorId === "0" ? "" : (values.majorId ?? "")
+      );
+      fd.append("Dob", values.dob ? values.dob.format("YYYY-MM-DD") : "");
+      fd.append(
+        "CompanyId",
+        values.companyId === 0 || values.companyId === "0" ? "" : (values.companyId ?? "")
+      );
+      fd.append("Fullname", values.fullname ?? "");
+      fd.append("Password", values.password ?? "");
+
+      const avatarFile = avatarFileList?.[0]?.originFileObj;
+      if (avatarFile instanceof File) {
+        fd.append("AvatarUrl", avatarFile, avatarFile.name);
+      }
+      const cvFile = cvFileList?.[0]?.originFileObj;
+      if (cvFile instanceof File) {
+        fd.append("CvUrl", cvFile, cvFile.name);
+      }
 
       await userApi.update(fd);
-      message.success("User updated successfully!");
+      navigate("/profile/cv", {
+        replace: true,
+        state: { profileUpdated: true },
+      });
     } catch (error) {
       console.error(error);
       message.error("Failed to update user");
@@ -75,7 +97,7 @@ const UpdateUserPage = ({ userId = 0 }) => {
     form={form}
     layout="vertical"
     onFinish={onFinish}
-    initialValues={{ userId: resolvedUserId, majorId: 0, companyId: 0 }}
+    initialValues={{ userId: resolvedUserId }}
   >
         <Form.Item name="userId" hidden>
           <Input />
@@ -109,12 +131,28 @@ const UpdateUserPage = ({ userId = 0 }) => {
           <Input />
         </Form.Item>
 
-        <Form.Item name="avatarUrl" label="Avatar URL">
-          <Input />
+        <Form.Item label="Avatar (optional)">
+          <Upload
+            accept="image/*"
+            maxCount={1}
+            beforeUpload={() => false}
+            fileList={avatarFileList}
+            onChange={({ fileList }) => setAvatarFileList(fileList)}
+          >
+            <Button>Select avatar file</Button>
+          </Upload>
         </Form.Item>
 
-        <Form.Item name="cvUrl" label="CV URL">
-          <Input />
+        <Form.Item label="CV (optional)">
+          <Upload
+            accept="application/pdf,.pdf"
+            maxCount={1}
+            beforeUpload={() => false}
+            fileList={cvFileList}
+            onChange={({ fileList }) => setCvFileList(fileList)}
+          >
+            <Button>Select CV file</Button>
+          </Upload>
         </Form.Item>
 
         <Form.Item name="password" label="Password">

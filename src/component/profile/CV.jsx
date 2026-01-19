@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { notification } from 'antd';
 import './CV.scss';
 import fptBadge from '../assets/fpt.png';
 import { useI18n } from '../../i18n/i18n.jsx';
@@ -7,8 +8,25 @@ import userApi from '../API/UserAPI.js';
 
 function CV({ student }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useI18n();
   // Remove internal panel state; CV now only shows profile info.
+
+  const didShowUpdateNoticeRef = useRef(false);
+
+  useEffect(() => {
+    if (didShowUpdateNoticeRef.current) return;
+    if (location?.state?.profileUpdated) {
+      didShowUpdateNoticeRef.current = true;
+      notification.success({
+        message: 'Cập nhật người dùng thành công.',
+        placement: 'topRight',
+        duration: 2,
+      });
+      // Clear state so refreshing / revisiting doesn't re-toast
+      navigate(location.pathname, { replace: true, state: {} });
+    }
+  }, [location, navigate]);
 
   const [profile, setProfile] = useState(null);
 
