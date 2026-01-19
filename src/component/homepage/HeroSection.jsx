@@ -1,7 +1,6 @@
 import React from "react";
 import { MessageSquare, BookOpen, Users, Zap, ArrowRight } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import heroImage from "../assets/hero-image.jpg";
 import "./HeroSection.css";
 import { useI18n } from "../../i18n/i18n.jsx";
 
@@ -9,10 +8,28 @@ const HeroSection = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
 
+  const heroBanner = "/Hero-banner-webFPTU-2026-2DaoTao100.jpg";
+  const fptLogo1 = "/fpt.png";
+  const fptLogo2 = "/fpt2.png";
+
+  const sliderImages = [
+    { src: heroBanner, alt: "FPTU banner", kind: "banner" },
+    { src: fptLogo1, alt: "FPT", kind: "logo" },
+    { src: fptLogo2, alt: "FPT", kind: "logo" },
+  ];
+
   return (
     <section className="hero-root">
-      <div className="hero-gradient" />
-      <div className="hero-overlay" />
+      <div className="hero-bg" aria-hidden="true">
+        <div className="hero-bg-image" style={{ backgroundImage: `url(${heroBanner})` }} />
+        <div className="hero-bg-wash" />
+        <div className="hero-bg-grid" />
+        <div className="hero-bg-orbs">
+          <span className="orb o1" />
+          <span className="orb o2" />
+          <span className="orb o3" />
+        </div>
+      </div>
 
       <div className="hero-container">
         <div className="hero-grid">
@@ -36,12 +53,20 @@ const HeroSection = () => {
             {/* CTA */}
             <div className="hero-ctas">
               <button
-                className="btn btn-primary"
+                className="hero-cta hero-cta-primary"
                 onClick={() => navigate("/qa")}
               >
                 <MessageSquare />
                 {t("hero_cta_ask")}
                 <ArrowRight />
+              </button>
+
+              <button
+                className="hero-cta hero-cta-secondary"
+                onClick={() => navigate("/ojt")}
+              >
+                <BookOpen />
+                OJT Docs
               </button>
             </div>
 
@@ -70,24 +95,41 @@ const HeroSection = () => {
 
           {/* RIGHT */}
           <div className="hero-right">
-            <img
-              src={heroImage}
-              alt="Hero"
-              className="hero-image"
-            />
+            <div className="hero-media" role="img" aria-label="FPT University" >
+              <div className="hero-media-glow" aria-hidden="true" />
 
-            <div className="floating-primary">
-              <MessageSquare />
-              <span>{t("floating_ai_assistant")}</span>
-            </div>
-
-            <div className="floating-card">
-              <div className="avatars">
-                <span className="a a1" />
-                <span className="a a2" />
-                <span className="a a3" />
+              <div className="hero-slider" aria-hidden="true">
+                <div className="hero-slider-track">
+                  {[...sliderImages, ...sliderImages].map((img, idx) => (
+                    <div
+                      key={`${img.src}-${idx}`}
+                      className={`hero-slide ${img.kind === "logo" ? "logo" : "banner"}`}
+					  style={
+						img.kind === "banner"
+							? { "--banner-bg": `url(${img.src})` }
+							: undefined
+					  }
+                    >
+                      <img src={img.src} alt={img.alt} loading="eager" />
+                    </div>
+                  ))}
+                </div>
               </div>
-              <span>{t("active_users")}</span>
+
+              <div className="floating-primary">
+                <MessageSquare />
+                <span>{t("floating_ai_assistant")}</span>
+              </div>
+
+              <div className="floating-card">
+                <div className="avatars" aria-hidden="true">
+                  <span className="a a1" />
+                  <span className="a a2" />
+                  <span className="a a3" />
+                </div>
+                <span>{t("active_users")}</span>
+              </div>
+
             </div>
           </div>
         </div>
