@@ -11,11 +11,11 @@ const sanitizeBaseUrl = (value) => {
 };
 
 const normalizeFileEntry = (entry) => {
-	// Backend may return strings (gcs_uri) OR objects ({display_name,gcs_uri,resource_name}).
-	if (entry == null) return { key: "file-null", gcsUri: "", label: "" };
+	// Backend may return strings (resource_name) OR objects ({display_name,resource_name,...}).
+	if (entry == null) return { key: "file-null", resourceName: "", label: "" };
 	if (typeof entry === "string") {
 		const v = entry.trim();
-		return { key: v || "file", gcsUri: v, label: v };
+		return { key: v || "file", resourceName: v, label: v };
 	}
 	if (typeof entry === "object") {
 		const displayName =
@@ -24,12 +24,6 @@ const normalizeFileEntry = (entry) => {
 				: typeof entry.displayName === "string"
 				? entry.displayName
 				: "";
-		const gcsUri =
-			typeof entry.gcs_uri === "string"
-				? entry.gcs_uri
-				: typeof entry.gcsUri === "string"
-				? entry.gcsUri
-				: "";
 		const resourceName =
 			typeof entry.resource_name === "string"
 				? entry.resource_name
@@ -37,9 +31,9 @@ const normalizeFileEntry = (entry) => {
 				? entry.resourceName
 				: "";
 
-		const label = displayName || gcsUri || resourceName || "(unknown file)";
-		const key = gcsUri || resourceName || displayName || JSON.stringify(entry);
-		return { key, gcsUri, label, raw: entry };
+		const label = displayName || resourceName || "(unknown file)";
+		const key = resourceName || displayName || JSON.stringify(entry);
+		return { key, resourceName, label, raw: entry };
 	}
 
 	const fallback = String(entry);
@@ -54,7 +48,7 @@ const OJTdocsAdmin = () => {
 	const [deleting, setDeleting] = useState(null);
 	const [error, setError] = useState("");
 	const [status, setStatus] = useState({ state: "checking", message: "" });
-	const [gcsUri, setGcsUri] = useState("");
+	const [urlInput, setUrlInput] = useState("");
 
 	const baseUrl = useMemo(() => {
 		const env = process.env.REACT_APP_RAG_API_BASE_URL;
@@ -86,7 +80,11 @@ const OJTdocsAdmin = () => {
 				throw new Error(text || `HTTP ${res.status}`);
 			}
 			const data = await res.json().catch(() => ({}));
-			const list = Array.isArray(data?.files) ? data.files : [];
+			const list = Array.isArray(data)
+				? data
+				: Array.isArray(data?.files)
+				? data.files
+				: [];
 			setRawFiles(list);
 
 			const normalized = list.map((entry) => normalizeFileEntry(entry));
@@ -106,24 +104,35 @@ const OJTdocsAdmin = () => {
 
 	const handleImport = async (event) => {
 		event.preventDefault();
-		if (!gcsUri.trim()) {
-			setError("Vui lòng nhập link (gcs_uri)");
+		if (!urlInput.trim()) {
+			setError("Vui lòng nhập URL");
 			return;
 		}
 		setImporting(true);
 		setError("");
 		try {
-			const url = `${baseUrl}/import_pdf?gcs_uri=${encodeURIComponent(gcsUri.trim())}`;
+			const url = `${baseUrl}/import_pdf?url=${encodeURIComponent(urlInput.trim())}`;
 			const res = await fetch(url, { method: "POST" });
 			const text = await res.text();
+			let payload = null;
+			try {
+				payload = text ? JSON.parse(text) : null;
+			} catch {
+				payload = null;
+			}
 			if (!res.ok) {
 				console.error("Import failed", res.status, res.statusText, text);
 				throw new Error(text || `HTTP ${res.status}`);
 			}
-			setGcsUri("");
+			console.groupCollapsed("[RAGdocs] /import_pdf response");
+			console.log({ url, status: res.status, payload: payload ?? text });
+			console.groupEnd();
+			setUrlInput("");
 			await loadFiles();
+			const successText =
+				payload?.message || payload?.title || "Upload tài liệu thành công";
 			Toastify({
-				text: "Upload tài liệu thành công",
+				text: successText,
 				duration: 1000,
 				gravity: "top",
 				position: "right",
@@ -142,22 +151,31 @@ const OJTdocsAdmin = () => {
 	};
 
 	const handleDelete = async (file) => {
-		const gcsUri = typeof file === "string" ? file : file?.gcsUri;
-		if (!gcsUri) {
-			console.error("Delete failed: missing gcs_uri", file);
-			setError("Missing gcs_uri for delete");
+		const resourceName = typeof file === "string" ? file : file?.resourceName;
+		if (!resourceName) {
+			console.error("Delete failed: missing resource_name", file);
+			setError("Missing resource_name for delete");
 			return;
 		}
-		setDeleting(gcsUri);
+		setDeleting(resourceName);
 		setError("");
 		try {
-			const url = `${baseUrl}/delete_file?gcs_uri=${encodeURIComponent(gcsUri)}`;
+			const url = `${baseUrl}/delete_file?resource_name=${encodeURIComponent(resourceName)}`;
 			const res = await fetch(url, { method: "DELETE" });
 			const text = await res.text();
+			let payload = null;
+			try {
+				payload = text ? JSON.parse(text) : null;
+			} catch {
+				payload = null;
+			}
 			if (!res.ok) {
 				console.error("Delete failed", res.status, res.statusText, text);
 				throw new Error(text || `HTTP ${res.status}`);
 			}
+			console.groupCollapsed("[RAGdocs] /delete_file response");
+			console.log({ url, status: res.status, payload: payload ?? text });
+			console.groupEnd();
 			await loadFiles();
 		} catch (err) {
 			setError(err.message || "Failed to delete file");
@@ -210,7 +228,7 @@ const OJTdocsAdmin = () => {
 						<table>
 							<thead>
 								<tr>
-									<th>File ID / gcs_uri</th>
+									<th>File / resource_name</th>
 									<th style={{ width: "140px" }}>Actions</th>
 								</tr>
 							</thead>
@@ -229,9 +247,9 @@ const OJTdocsAdmin = () => {
 											<button
 												className="btn danger"
 												onClick={() => handleDelete(file)}
-												disabled={deleting === file.gcsUri}
+												disabled={deleting === file.resourceName}
 											>
-												{deleting === file.gcsUri ? "Deleting..." : "Delete"}
+												{deleting === file.resourceName ? "Deleting..." : "Delete"}
 											</button>
 										</td>
 									</tr>
@@ -250,13 +268,13 @@ const OJTdocsAdmin = () => {
 					</div>
 
 					<form className="import-form" onSubmit={handleImport}>
-						<label htmlFor="gcs_uri">Add PDF/docs</label>
+						<label htmlFor="url">Add PDF/docs URL</label>
 						<input
-							id="gcs_uri"
+							id="url"
 							type="text"
 							placeholder="https://drive.google.com/..."
-							value={gcsUri}
-							onChange={(e) => setGcsUri(e.target.value)}
+							value={urlInput}
+							onChange={(e) => setUrlInput(e.target.value)}
 							disabled={importing}
 						/>
 						<button className="btn primary" type="submit" disabled={importing}>
