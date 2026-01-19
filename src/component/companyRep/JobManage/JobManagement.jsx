@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Table, Input, Button, Card, Modal, Form, InputNumber, Popconfirm, Select, Switch, Tag, message } from "antd";
+import { Table, Input, Button, Card, Modal, Form, InputNumber, Popconfirm, Select, Switch, Tabs, Tag, message } from "antd";
 import { RefreshCcw, Search, Plus, Pencil, Trash2, FileText } from "lucide-react";
 import jobApi from "../../API/JobAPI";
 import jobPositionApi from "../../API/JobPositionAPI";
@@ -27,7 +27,7 @@ const debugLog = (...args) => {
   console.log("[JobManagement]", ...args);
 };
 
-const JobManagement = () => {
+const JobManagement = ({ variant = "company" }) => {
   const [jobs, setJobs] = useState([]);
   const [filtered, setFiltered] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -45,6 +45,11 @@ const JobManagement = () => {
   const [semesters, setSemesters] = useState([]);
   const [semesterCompanies, setSemesterCompanies] = useState([]);
   const [companies, setCompanies] = useState([]);
+
+  const showTabs = variant === "admin";
+  const positionsReadOnly = variant === "admin";
+
+  const [activeTab, setActiveTab] = useState("positions");
 
   const [descriptionsByJobPositionId, setDescriptionsByJobPositionId] = useState({});
   const [messageApi, contextHolder] = message.useMessage();
@@ -174,12 +179,13 @@ const JobManagement = () => {
       const res = await jobPositionApi.getAll();
       const list = res.data?.data || [];
       setJobPositionsRaw(list);
-      const companyId = getCompanyIdFromStorage();
+      const companyId = variant === "admin" ? null : getCompanyIdFromStorage();
       const visible = filterJobPositionsForCompany(list, semesterCompanies, companyId);
       debugLog("fetchJobPositions()", {
         total: list.length,
         visible: visible.length,
         companyId,
+        variant,
       });
       setJobPositions(visible);
       setFilteredPositions(visible);
@@ -192,17 +198,18 @@ const JobManagement = () => {
 
   useEffect(() => {
     if (!jobPositionsRaw.length) return;
-    const companyId = getCompanyIdFromStorage();
+    const companyId = variant === "admin" ? null : getCompanyIdFromStorage();
     const visible = filterJobPositionsForCompany(jobPositionsRaw, semesterCompanies, companyId);
     debugLog("re-filter jobPositionsRaw after semesterCompanies change", {
       raw: jobPositionsRaw.length,
       visible: visible.length,
       companyId,
+      variant,
     });
     setJobPositions(visible);
     setFilteredPositions(visible);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [semesterCompanies]);
+  }, [semesterCompanies, variant]);
 
   const fetchDescriptions = async () => {
     try {
@@ -770,7 +777,10 @@ const JobManagement = () => {
         );
       },
     },
-    {
+  ];
+
+  if (!positionsReadOnly) {
+    positionColumns.push({
       title: "Actions",
       key: "actions",
       width: 320,
@@ -806,8 +816,8 @@ const JobManagement = () => {
           </Popconfirm>
         </div>
       ),
-    },
-  ];
+    });
+  }
 
   const descriptionColumns = [
     {
@@ -876,45 +886,190 @@ const JobManagement = () => {
     <>
       {contextHolder}
       <Card className="job-management-wrapper">
-        <>
-          <div className="job-management-header">
-            <Input
-              placeholder="Search job position..."
-              prefix={<Search size={16} />}
-              className="job-search-input"
-              onChange={(e) => handleSearchPositions(e.target.value)}
-            />
+        {showTabs ? (
+          <Tabs
+            activeKey={activeTab}
+            onChange={setActiveTab}
+            items={[
+              {
+                key: "positions",
+                label: "Job Positions",
+                children: (
+                  <>
+                    <div className="job-management-header">
+                      <Input
+                        placeholder="Search job position..."
+                        prefix={<Search size={16} />}
+                        className="job-search-input"
+                        onChange={(e) => handleSearchPositions(e.target.value)}
+                      />
 
-            <div className="job-header-buttons">
-              <Button
-                className="job-create-btn"
-                type="primary"
-                icon={<Plus size={16} />}
-                onClick={openCreatePositionModal}
-                disabled={!canManageJobPositionsForActiveSemester}
-              >
-                Create
-              </Button>
+                      <div className="job-header-buttons">
+                        {!positionsReadOnly && (
+                          <Button
+                            className="job-create-btn"
+                            type="primary"
+                            icon={<Plus size={16} />}
+                            onClick={openCreatePositionModal}
+                            disabled={!canManageJobPositionsForActiveSemester}
+                          >
+                            Create
+                          </Button>
+                        )}
 
-              <Button
-                className="job-refresh-btn"
-                icon={<RefreshCcw size={16} />}
-                onClick={refreshAll}
-              >
-                Refresh
-              </Button>
-            </div>
-          </div>
+                        <Button
+                          className="job-refresh-btn"
+                          icon={<RefreshCcw size={16} />}
+                          onClick={refreshAll}
+                        >
+                          Refresh
+                        </Button>
+                      </div>
+                    </div>
 
-          <Table
-            columns={positionColumns}
-            dataSource={filteredPositions}
-            rowKey="jobPositionId"
-            loading={positionsLoading}
-            pagination={{ pageSize: 10 }}
-            scroll={{ x: true }}
+                    <Table
+                      columns={positionColumns}
+                      dataSource={filteredPositions}
+                      rowKey="jobPositionId"
+                      loading={positionsLoading}
+                      pagination={{ pageSize: 10 }}
+                      scroll={{ x: true }}
+                    />
+                  </>
+                ),
+              },
+              {
+                key: "titles",
+                label: "Job Titles",
+                children: (
+                  <>
+                    <div className="job-management-header">
+                      <Input
+                        placeholder="Search job title..."
+                        prefix={<Search size={16} />}
+                        className="job-search-input"
+                        onChange={(e) => handleSearch(e.target.value)}
+                      />
+
+                      <div className="job-header-buttons">
+                        <Button
+                          className="job-create-btn"
+                          type="primary"
+                          icon={<Plus size={16} />}
+                          onClick={openCreateModal}
+                        >
+                          Create
+                        </Button>
+
+                        <Button
+                          className="job-refresh-btn"
+                          icon={<RefreshCcw size={16} />}
+                          onClick={refreshAll}
+                        >
+                          Refresh
+                        </Button>
+                      </div>
+                    </div>
+
+                    <Table
+                      columns={columns}
+                      dataSource={filtered}
+                      rowKey="jobTitleId"
+                      loading={loading}
+                      pagination={{ pageSize: 10 }}
+                    />
+                  </>
+                ),
+              },
+              {
+                key: "descriptions",
+                label: "Job Descriptions",
+                children: (
+                  <>
+                    <div className="job-management-header">
+                      <Input
+                        placeholder="Search job description..."
+                        prefix={<Search size={16} />}
+                        className="job-search-input"
+                        onChange={(e) => handleSearchDescriptions(e.target.value)}
+                      />
+
+                      <div className="job-header-buttons">
+                        <Button
+                          className="job-create-btn"
+                          type="primary"
+                          icon={<Plus size={16} />}
+                          onClick={openCreateDescriptionModal}
+                        >
+                          Create
+                        </Button>
+
+                        <Button
+                          className="job-refresh-btn"
+                          icon={<RefreshCcw size={16} />}
+                          onClick={refreshAll}
+                        >
+                          Refresh
+                        </Button>
+                      </div>
+                    </div>
+
+                    <Table
+                      columns={descriptionColumns}
+                      dataSource={filteredDescriptions}
+                      rowKey={(r) =>
+                        r?.jobDescriptionId ?? r?.jobDescriptionID ?? r?.jobDescriptionid ?? r?.id ?? r?.Id
+                      }
+                      loading={descriptionsLoading}
+                      pagination={{ pageSize: 10 }}
+                      scroll={{ x: true }}
+                    />
+                  </>
+                ),
+              },
+            ]}
           />
-        </>
+        ) : (
+          <>
+            <div className="job-management-header">
+              <Input
+                placeholder="Search job position..."
+                prefix={<Search size={16} />}
+                className="job-search-input"
+                onChange={(e) => handleSearchPositions(e.target.value)}
+              />
+
+              <div className="job-header-buttons">
+                <Button
+                  className="job-create-btn"
+                  type="primary"
+                  icon={<Plus size={16} />}
+                  onClick={openCreatePositionModal}
+                  disabled={!canManageJobPositionsForActiveSemester}
+                >
+                  Create
+                </Button>
+
+                <Button
+                  className="job-refresh-btn"
+                  icon={<RefreshCcw size={16} />}
+                  onClick={refreshAll}
+                >
+                  Refresh
+                </Button>
+              </div>
+            </div>
+
+            <Table
+              columns={positionColumns}
+              dataSource={filteredPositions}
+              rowKey="jobPositionId"
+              loading={positionsLoading}
+              pagination={{ pageSize: 10 }}
+              scroll={{ x: true }}
+            />
+          </>
+        )}
       </Card>
 
       {/* CREATE / EDIT MODAL */}

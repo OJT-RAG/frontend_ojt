@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from "react";
-import { Link, useLocation } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useI18n } from "../../i18n/i18n.jsx";
 import { useAuth } from "../Hook/useAuth.jsx";
 import {
@@ -12,12 +12,19 @@ const Header = () => {
   const { authUser, role, logout } = useAuth();
   const { lang, setLang, t } = useI18n();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const [activeSemester, setActiveSemester] = useState(null);
   const [isLangOpen, setIsLangOpen] = useState(false);
 
   const languageCode = (lang || "en").toUpperCase().slice(0, 2);
   const isActive = (path) => location.pathname === path;
+
+  const handleLogout = () => {
+    logout();
+    setIsLangOpen(false);
+    navigate("/login", { replace: true });
+  };
 
   useEffect(() => {
     let mounted = true;
@@ -88,7 +95,7 @@ const Header = () => {
           </div>
 
           {role !== "guest" ? (
-            <button className="btn btn-card" onClick={logout}>
+            <button className="btn btn-card" onClick={handleLogout}>
               <User /> <span>{t("logout")}</span>
             </button>
           ) : (

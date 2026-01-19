@@ -5,7 +5,7 @@ import "./JobManager.scss";
 const JobManager = () => {
   return (
     <div className="admin-page job-manager">
-      <JobManagement />
+      <JobManagement variant="admin" />
     </div>
   );
 };
