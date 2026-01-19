@@ -1,37 +1,28 @@
 import React, { useState } from "react";
-import { Form, Input, Button, Upload, InputNumber, Card, notification, Switch } from "antd";
-import { UploadOutlined } from "@ant-design/icons";
+import { Form, Input, Button, InputNumber, Card, notification, Switch } from "antd";
 import companyApi from "../../API/CompanyAPI";
 
 const CompanyUpdatePage = () => {
   const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
 
-  const normFile = (e) => e?.fileList ?? [];
-
   const onFinish = async (values) => {
     setLoading(true);
 
-    const formData = new FormData();
-
-    formData.append("company_ID", values.company_ID);
-    formData.append("majorID", values.majorID ?? "");
-    formData.append("name", values.name);
-    formData.append("tax_Code", values.tax_Code);
-    formData.append("address", values.address);
-    formData.append("website", values.website);
-    formData.append("contact_Email", values.contact_Email);
-    formData.append("phone", values.phone);
-    formData.append("is_Verified", values.is_Verified);
-
-    // Thêm logo nếu có upload mới
-    const file = values.logo_URL?.[0]?.originFileObj;
-    if (file) {
-      formData.append("logo_URL", file, file.name);
-    }
+    const payload = {
+      company_ID: Number(values.company_ID),
+      name: String(values.name || "").trim(),
+      tax_Code: String(values.tax_Code || "").trim(),
+      address: String(values.address || "").trim(),
+      website: String(values.website || "").trim(),
+      contact_Email: String(values.contact_Email || "").trim(),
+      phone: String(values.phone || "").trim(),
+      logo_URL: String(values.logo_URL || "").trim(),
+      is_Verified: !!values.is_Verified,
+    };
 
     try {
-      await companyApi.update(formData);
+      await companyApi.update(payload);
 
       notification.success({
         message: "Cập nhật thành công",
@@ -40,12 +31,11 @@ const CompanyUpdatePage = () => {
 
       form.resetFields();
     } catch (error) {
-  notification.error({
-    message: "Cập nhật thất bại",
-    description: error.response?.data?.message || "Không thể kết nối API",
-  });
-}
- finally {
+      notification.error({
+        message: "Cập nhật thất bại",
+        description: error.response?.data?.message || "Không thể kết nối API",
+      });
+    } finally {
       setLoading(false);
     }
   };
@@ -56,10 +46,6 @@ const CompanyUpdatePage = () => {
         
         <Form.Item name="company_ID" label="Company ID" rules={[{ required: true }]}>
           <InputNumber style={{ width: "100%" }} placeholder="Nhập ID công ty cần update" />
-        </Form.Item>
-
-        <Form.Item name="majorID" label="Major ID">
-          <InputNumber style={{ width: "100%" }} placeholder="Major ID (có thể null)" />
         </Form.Item>
 
         <Form.Item name="name" label="Tên Công Ty" rules={[{ required: true }]}>
@@ -86,15 +72,8 @@ const CompanyUpdatePage = () => {
           <Input />
         </Form.Item>
 
-        <Form.Item 
-          name="logo_URL" 
-          label="Logo Công Ty (Tải lên mới nếu muốn)"
-          valuePropName="fileList"
-          getValueFromEvent={normFile}
-        >
-          <Upload beforeUpload={() => false} maxCount={1} accept=".png,.jpg,.jpeg">
-            <Button icon={<UploadOutlined />}>Chọn Logo</Button>
-          </Upload>
+        <Form.Item name="logo_URL" label="Logo URL">
+          <Input placeholder="https://..." />
         </Form.Item>
 
         <Form.Item name="is_Verified" label="Đã xác thực" valuePropName="checked">

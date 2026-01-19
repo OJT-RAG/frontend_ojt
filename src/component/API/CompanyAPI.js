@@ -7,13 +7,8 @@ const companyApi = {
 
   create: (data) => httpClient.post("/Company/create", data),
 
-  update: (data) => {
-    // Admin spec uses JSON with PUT. Some existing UI sends FormData, so support both.
-    const isFormData = typeof FormData !== "undefined" && data instanceof FormData;
-    return httpClient.put("/Company/update", data, isFormData
-      ? { headers: { "Content-Type": "multipart/form-data" } }
-      : undefined);
-  },
+  // Swagger: PUT /api/Company/update (application/json)
+  update: (data) => httpClient.put("/Company/update", data),
 
   deleteById: (id) => httpClient.delete(`/Company/delete/${id}`),
 };

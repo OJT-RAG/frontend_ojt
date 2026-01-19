@@ -1,12 +1,13 @@
 import React, { useEffect, useMemo, useState } from "react";
 import { Button, Input, Table, Tag, message, Modal } from "antd";
-import { RefreshCcw, Search } from "lucide-react";
+import { Bookmark, BookmarkCheck, RefreshCcw, Search } from "lucide-react";
 import jobPositionApi from "../../API/JobPositionAPI";
 import jobDescriptionApi from "../../API/JobDescriptionAPI";
 import majorApi from "../../API/MajorAPI";
 import semesterApi from "../../API/SemesterAPI";
 import userApi from "../../API/UserAPI";
 import jobApplicationApi from "../../API/JobApplicationAPI";
+import jobBookmarkApi from "../../API/JobBookmarkAPI";
 
 import "./StudentJobsPage.css";
 
@@ -47,6 +48,30 @@ export default function StudentJobsPage() {
 
   const [applyingId, setApplyingId] = useState(null);
 
+  const [bookmarkByJobPositionId, setBookmarkByJobPositionId] = useState({});
+  const [bookmarkBusyId, setBookmarkBusyId] = useState(null);
+  const [showBookmarkedOnly, setShowBookmarkedOnly] = useState(false);
+
+  const loadBookmarks = async () => {
+    const { userId } = resolveAuthContext();
+    if (!userId) {
+      setBookmarkByJobPositionId({});
+      return;
+    }
+
+    const res = await jobBookmarkApi.getByUserId(userId);
+    const list = res?.data?.data || [];
+    const map = {};
+    for (const b of list) {
+      const jobPositionId = b?.jobPositionId ?? b?.jobPositionID;
+      const jobBookmarkId = b?.jobBookmarkId ?? b?.jobBookmarkID ?? b?.id;
+      if (jobPositionId != null && jobBookmarkId != null) {
+        map[jobPositionId] = jobBookmarkId;
+      }
+    }
+    setBookmarkByJobPositionId(map);
+  };
+
   const refresh = async () => {
     try {
       setLoading(true);
@@ -71,6 +96,13 @@ export default function StudentJobsPage() {
         if (jobPositionId != null) map[jobPositionId] = { ...item, _text: text };
       }
       setDescriptionsByJobPositionId(map);
+
+      // Load bookmarks for current user (best-effort)
+      try {
+        await loadBookmarks();
+      } catch (bookmarkErr) {
+        console.warn("Failed to load bookmarks:", bookmarkErr);
+      }
     } catch (err) {
       console.error("Failed to fetch job positions:", err);
       messageApi.error(
@@ -102,9 +134,15 @@ export default function StudentJobsPage() {
 
   const filteredRows = useMemo(() => {
     const q = (query || "").trim().toLowerCase();
-    if (!q) return rows;
+    let list = rows;
 
-    return rows.filter((jp) => {
+    if (showBookmarkedOnly) {
+      list = list.filter((jp) => !!bookmarkByJobPositionId[jp?.jobPositionId]);
+    }
+
+    if (!q) return list;
+
+    return list.filter((jp) => {
       const title = (jp?.jobTitle || "").toLowerCase();
       const location = (jp?.location || "").toLowerCase();
       const salary = (jp?.salaryRange || "").toLowerCase();
@@ -120,7 +158,58 @@ export default function StudentJobsPage() {
         desc.includes(q)
       );
     });
-  }, [rows, query, majorTitleById, semesterNameById, descriptionsByJobPositionId]);
+  }, [rows, query, majorTitleById, semesterNameById, descriptionsByJobPositionId, showBookmarkedOnly, bookmarkByJobPositionId]);
+
+  const toggleBookmark = async (record) => {
+    const { userId } = resolveAuthContext();
+    if (!userId) {
+      messageApi.warning("Please login first.");
+      return;
+    }
+
+    const jobPositionId = record?.jobPositionId;
+    if (!jobPositionId) {
+      messageApi.error("Invalid job position.");
+      return;
+    }
+
+    const existingBookmarkId = bookmarkByJobPositionId[jobPositionId];
+    try {
+      setBookmarkBusyId(jobPositionId);
+
+      if (existingBookmarkId) {
+        await jobBookmarkApi.deleteById(existingBookmarkId);
+        setBookmarkByJobPositionId((prev) => {
+          const next = { ...prev };
+          delete next[jobPositionId];
+          return next;
+        });
+        messageApi.success("Removed from bookmarks");
+      } else {
+        const res = await jobBookmarkApi.create({ userId, jobPositionId });
+        const createdId =
+          res?.data?.data?.jobBookmarkId ||
+          res?.data?.data?.jobBookmarkID ||
+          res?.data?.data?.id;
+        if (createdId) {
+          setBookmarkByJobPositionId((prev) => ({ ...prev, [jobPositionId]: createdId }));
+        } else {
+          // Fallback: reload bookmark list
+          await loadBookmarks();
+        }
+        messageApi.success("Bookmarked");
+      }
+    } catch (err) {
+      console.error("[BOOKMARK] error:", err);
+      messageApi.error(
+        err?.response?.data?.message ||
+          err?.response?.data ||
+          "Bookmark action failed"
+      );
+    } finally {
+      setBookmarkBusyId(null);
+    }
+  };
 
   const handleApply = async (record) => {
   const { userId } = resolveAuthContext();
@@ -210,6 +299,25 @@ export default function StudentJobsPage() {
       },
     },
     {
+      title: "Bookmark",
+      key: "bookmark",
+      width: 140,
+      render: (_, record) => {
+        const jobPositionId = record?.jobPositionId;
+        const isBookmarked = !!bookmarkByJobPositionId[jobPositionId];
+        const busy = bookmarkBusyId === jobPositionId;
+        return (
+          <Button
+            onClick={() => toggleBookmark(record)}
+            loading={busy}
+            icon={isBookmarked ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
+          >
+            {isBookmarked ? "Saved" : "Save"}
+          </Button>
+        );
+      },
+    },
+    {
   title: "Actions",
   key: "actions",
   width: 160,
@@ -247,6 +355,12 @@ export default function StudentJobsPage() {
             onChange={(e) => setQuery(e.target.value)}
             allowClear
           />
+          <Button
+            onClick={() => setShowBookmarkedOnly((v) => !v)}
+            icon={showBookmarkedOnly ? <BookmarkCheck size={16} /> : <Bookmark size={16} />}
+          >
+            {showBookmarkedOnly ? "Bookmarks" : "All"}
+          </Button>
           <Button icon={<RefreshCcw size={16} />} onClick={refresh} loading={loading}>
             Refresh
           </Button>

@@ -1,17 +1,14 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import './CompanyManager.scss';
 import companyApi from '../../API/CompanyAPI';
-import majorApi from '../../API/MajorAPI';
 
 const CompanyManager = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [companies, setCompanies] = useState([]);
-  const [majors, setMajors] = useState([]);
 
   const [creating, setCreating] = useState(false);
   const [createForm, setCreateForm] = useState({
-    majorID: '',
     name: '',
     tax_Code: '',
     address: '',
@@ -24,7 +21,6 @@ const CompanyManager = () => {
 
   const [editingId, setEditingId] = useState(null);
   const [editForm, setEditForm] = useState({
-    majorID: '',
     name: '',
     tax_Code: '',
     address: '',
@@ -42,21 +38,17 @@ const CompanyManager = () => {
       setLoading(true);
       setError('');
       try {
-        const [companyRes, majorRes] = await Promise.all([
+        const [companyRes] = await Promise.all([
           companyApi.getAll(),
-          majorApi.getAll(),
         ]);
 
         const list = companyRes?.data?.data || [];
-        const majorList = majorRes?.data?.data || [];
         if (cancelled) return;
         setCompanies(Array.isArray(list) ? list : []);
-        setMajors(Array.isArray(majorList) ? majorList : []);
       } catch (e) {
         if (cancelled) return;
         setError(e?.response?.data?.message || e?.message || 'Failed to load companies');
         setCompanies([]);
-        setMajors([]);
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -78,29 +70,8 @@ const CompanyManager = () => {
     }
   };
 
-  const majorOptions = useMemo(() => {
-    return majors
-      .map((m) => {
-        const id = m?.majorId ?? m?.MajorId ?? m?.majorID ?? m?.MajorID ?? m?.id ?? m?.Id;
-        const name = m?.majorTitle ?? m?.majorName ?? m?.name ?? String(id ?? '');
-        if (id == null) return null;
-        return { id: String(id), name };
-      })
-      .filter(Boolean);
-  }, [majors]);
-
-  const majorMap = useMemo(() => {
-    const map = new Map();
-    majorOptions.forEach((m) => map.set(Number(m.id), m.name));
-    return map;
-  }, [majorOptions]);
-
   const getCompanyId = (c) => (
     c?.company_ID ?? c?.Company_ID ?? c?.companyId ?? c?.CompanyId ?? c?.id ?? c?.Id
-  );
-
-  const getMajorId = (c) => (
-    c?.majorID ?? c?.MajorID ?? c?.majorId ?? c?.MajorId
   );
 
   const getVerified = (c) => {
@@ -112,7 +83,6 @@ const CompanyManager = () => {
 
   const resetCreate = () => {
     setCreateForm({
-      majorID: '',
       name: '',
       tax_Code: '',
       address: '',
@@ -141,7 +111,6 @@ const CompanyManager = () => {
     const id = getCompanyId(c);
     setEditingId(id != null ? Number(id) : null);
     setEditForm({
-      majorID: getMajorId(c) != null ? String(getMajorId(c)) : '',
       name: c?.name ?? '',
       tax_Code: c?.tax_Code ?? c?.taxCode ?? '',
       address: c?.address ?? '',
@@ -156,7 +125,6 @@ const CompanyManager = () => {
   const cancelEdit = () => {
     setEditingId(null);
     setEditForm({
-      majorID: '',
       name: '',
       tax_Code: '',
       address: '',
@@ -171,7 +139,6 @@ const CompanyManager = () => {
   const validateForm = (f) => {
     if (!String(f.name || '').trim()) return 'Company name is required.';
     if (!String(f.tax_Code || '').trim()) return 'Tax code is required.';
-    if (!f.majorID) return 'Major is required.';
     return null;
   };
 
@@ -184,7 +151,6 @@ const CompanyManager = () => {
 
     try {
       const payload = {
-        majorID: Number(createForm.majorID),
         name: String(createForm.name).trim(),
         tax_Code: String(createForm.tax_Code).trim(),
         address: String(createForm.address || '').trim(),
@@ -213,7 +179,6 @@ const CompanyManager = () => {
 
     try {
       const payload = {
-        majorID: Number(editForm.majorID),
         name: String(editForm.name).trim(),
         tax_Code: String(editForm.tax_Code).trim(),
         address: String(editForm.address || '').trim(),
@@ -263,7 +228,8 @@ const CompanyManager = () => {
             <tr>
               <th>Company Name</th>
               <th>Tax Code</th>
-              <th>Major</th>
+              <th>Address</th>
+              <th>Website</th>
               <th>Status</th>
               <th>Contact Email</th>
               <th>Phone</th>
@@ -290,16 +256,20 @@ const CompanyManager = () => {
                   />
                 </td>
                 <td>
-                  <select
+                  <input
                     className="cm-input"
-                    value={createForm.majorID}
-                    onChange={(e) => setCreateForm((p) => ({ ...p, majorID: e.target.value }))}
-                  >
-                    <option value="">Select major</option>
-                    {majorOptions.map((m) => (
-                      <option key={m.id} value={m.id}>{m.name}</option>
-                    ))}
-                  </select>
+                    value={createForm.address}
+                    onChange={(e) => setCreateForm((p) => ({ ...p, address: e.target.value }))}
+                    placeholder="Address"
+                  />
+                </td>
+                <td>
+                  <input
+                    className="cm-input"
+                    value={createForm.website}
+                    onChange={(e) => setCreateForm((p) => ({ ...p, website: e.target.value }))}
+                    placeholder="https://..."
+                  />
                 </td>
                 <td>
                   <label className="cm-check">
@@ -336,23 +306,21 @@ const CompanyManager = () => {
 
             {loading ? (
               <tr>
-                <td colSpan={7}>Loading...</td>
+                <td colSpan={8}>Loading...</td>
               </tr>
             ) : error ? (
               <tr>
-                <td colSpan={7}>{error}</td>
+                <td colSpan={8}>{error}</td>
               </tr>
             ) : companies.length === 0 ? (
               <tr>
-                <td colSpan={7}>No companies found.</td>
+                <td colSpan={8}>No companies found.</td>
               </tr>
             ) : (
               companies.map((c) => {
                 const id = getCompanyId(c);
                 const numericId = id != null ? Number(id) : null;
                 const isEditing = numericId != null && editingId === numericId;
-                const majorId = getMajorId(c);
-                const majorName = majorId != null ? (majorMap.get(Number(majorId)) || String(majorId)) : '-';
                 const verified = getVerified(c);
 
                 return (
@@ -381,18 +349,28 @@ const CompanyManager = () => {
                     </td>
                     <td>
                       {isEditing ? (
-                        <select
+                        <input
                           className="cm-input"
-                          value={editForm.majorID}
-                          onChange={(e) => setEditForm((p) => ({ ...p, majorID: e.target.value }))}
-                        >
-                          <option value="">Select major</option>
-                          {majorOptions.map((m) => (
-                            <option key={m.id} value={m.id}>{m.name}</option>
-                          ))}
-                        </select>
+                          value={editForm.address}
+                          onChange={(e) => setEditForm((p) => ({ ...p, address: e.target.value }))}
+                          placeholder="Address"
+                        />
                       ) : (
-                        majorName
+                        c?.address ?? '-'
+                      )}
+                    </td>
+                    <td>
+                      {isEditing ? (
+                        <input
+                          className="cm-input"
+                          value={editForm.website}
+                          onChange={(e) => setEditForm((p) => ({ ...p, website: e.target.value }))}
+                          placeholder="https://..."
+                        />
+                      ) : c?.website ? (
+                        <a href={c.website} target="_blank" rel="noreferrer">{c.website}</a>
+                      ) : (
+                        '-'
                       )}
                     </td>
                     <td>
