@@ -10,6 +10,9 @@ import { useI18n } from "../../i18n/i18n.jsx";
 import "./ChatPage.scss";
 import { useNavigate } from "react-router-dom";
 import chatRoomApi from "../API/chatRoomApi.js";
+import userApi from "../API/UserAPI.js";
+import userChatApi from "../API/UserChatAPI";
+import useChatHub from "../Hook/useChathub.js";
 import { FileText, Paperclip, Sparkles } from "lucide-react";
 
 const LOCAL_STORAGE_KEY = "ojt-rag-chat-sessions";
@@ -120,6 +123,8 @@ const normalizeSession = (session, translate, indexFallback = 1) => {
     updatedAt,
     origin: session.origin || "local",
     remoteId: session.remoteId || session.sessionId || null,
+    type: session.type,
+  staffId: session.staffId,
   };
 };
 
@@ -146,8 +151,23 @@ const createLocalSession = (translate, index = 1) => {
     updatedAt: createdAt,
     messages: [],
     origin: "local",
+    type: "ai", // ✅ ADD
     remoteId: null,
   };
+};
+const STAFF_RR_KEY = "staff_round_robin_index";
+
+const pickStaffRoundRobin = (staffList) => {
+  if (!Array.isArray(staffList) || staffList.length === 0) return null;
+
+  const rawIndex = Number(localStorage.getItem(STAFF_RR_KEY) || 0);
+  const index = rawIndex % staffList.length;
+
+  const picked = staffList[index];
+
+  localStorage.setItem(STAFF_RR_KEY, String(index + 1));
+
+  return picked;
 };
 
 const loadStoredSessions = (translate) => {
@@ -319,6 +339,19 @@ const ChatPage = () => {
   const initialSessionsRef = useRef(null);
   const cvInputRef = useRef(null);
   const navigate = useNavigate();
+  const currentUser = useMemo(() => {
+  for (let i = 0; i < localStorage.length; i++) {
+    try {
+      const parsed = JSON.parse(localStorage.getItem(localStorage.key(i)));
+      if (parsed?.id && parsed?.email) return parsed;
+    } catch {}
+  }
+  return null;
+}, []);
+
+const currentUserId = currentUser
+  ? Number(currentUser.userId ?? currentUser.id)
+  : null;
 
   if (initialSessionsRef.current === null) {
     const stored = loadStoredSessions(t);
@@ -326,9 +359,86 @@ const ChatPage = () => {
   }
 
   const [sessions, setSessions] = useState(initialSessionsRef.current);
+  const createStaffSession = (staff) => {
+  const staffUserId = Number(staff?.userId ?? staff?.id);
+
+  if (!staffUserId) {
+    console.error("❌ STAFF OBJECT INVALID", staff);
+    return null;
+  }
+
+  return {
+    id: `staff-${staffUserId}-${Date.now()}`,
+    remoteId: `staff-${staffUserId}`,
+    staffId: staffUserId,          // 🔥 QUAN TRỌNG
+    title: `Chat with ${staff.fullname || staff.email}`,
+    type: "staff",
+    origin: "staff",
+    messages: [],
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  };
+};
+
+
   const [activeSessionId, setActiveSessionId] = useState(
     initialSessionsRef.current[0]?.id || null
   );
+
+  const handleIncomingStaffMessage = useCallback(
+  (message) => {
+    console.log("📨 SignalR incoming:", message);
+
+    if (!message?.senderId || !message?.receiverId) return;
+
+    setSessions(prev => {
+      let targetSessionId = null;
+
+      const updated = prev.map(session => {
+        if (session.type !== "staff") return session;
+
+        const staffId = session.staffId;
+        const isRelated =
+          (message.senderId === currentUserId &&
+            message.receiverId === staffId) ||
+          (message.senderId === staffId &&
+            message.receiverId === currentUserId);
+
+        if (!isRelated) return session;
+
+        targetSessionId = session.id;
+
+        if (session.messages.some(m => m.id === message.id)) {
+          return session;
+        }
+
+        const newMsg = {
+          id: message.id,
+          role: message.senderId === currentUserId ? "user" : "assistant",
+          text: message.content,
+          timestamp: message.createdAt || nowIso(),
+        };
+
+        return {
+          ...session,
+          messages: [...session.messages, newMsg],
+          updatedAt: newMsg.timestamp,
+        };
+      });
+
+      // 🔥 AUTO OPEN SESSION IF NOT ACTIVE
+      if (targetSessionId && targetSessionId !== activeSessionId) {
+        setActiveSessionId(targetSessionId);
+      }
+
+      return updated;
+    });
+  },
+  [currentUserId, activeSessionId]
+);
+
+
+// useChatHub(currentUserId, handleIncomingStaffMessage);
   const [inputValue, setInputValue] = useState("");
   const [cvFile, setCvFile] = useState(null);
   const [sending, setSending] = useState(false);
@@ -404,6 +514,23 @@ const ChatPage = () => {
   useEffect(() => {
     scrollToBottom();
   }, [scrollToBottom, sessions, activeSessionId, sending]);
+  const [staffList, setStaffList] = useState([]);
+
+useEffect(() => {
+  const loadStaff = async () => {
+    try {
+      const res = await userApi.getAll();
+      const data = res?.data?.data || res?.data || [];
+
+      const staffs = data.filter(u => u.role === "cro_staff");
+      setStaffList(staffs);
+    } catch (err) {
+      console.error("Failed to load staff list", err);
+    }
+  };
+
+  loadStaff();
+}, []);
 
   useEffect(() => {
     if (!ragBaseUrl) return;
@@ -628,8 +755,124 @@ const ChatPage = () => {
     setLastError("");
     setCvFile(file);
   }, [t]);
+  useEffect(() => {
+  if (!activeSession || activeSession.type !== "staff") return;
+
+  // load lần đầu
+  loadStaffConversation(activeSession);
+
+  const timer = setInterval(() => {
+    loadStaffConversation(activeSession);
+  }, 3000); // 3s polling
+
+  return () => clearInterval(timer);
+}, [activeSessionId]);
+
+  const loadStaffConversation = async (session) => {
+  if (!currentUserId || !session?.staffId) return;
+
+  try {
+    const res = await userChatApi.getConversation(
+      currentUserId,
+      session.staffId
+    );
+
+    const data = Array.isArray(res?.data)
+      ? res.data
+      : Array.isArray(res?.data?.data)
+      ? res.data.data
+      : [];
+
+    setSessions(prev =>
+      prev.map(s => {
+        if (s.id !== session.id) return s;
+
+        const existingIds = new Set(s.messages.map(m => m.id));
+        const newMessages = data
+          .map(m => ({
+            id: m.id,
+            role: m.senderId === currentUserId ? "user" : "assistant",
+            text: m.content,
+            timestamp: m.createdAt || m.timestamp,
+          }))
+          .filter(m => !existingIds.has(m.id));
+
+        if (newMessages.length === 0) return s;
+
+        return {
+          ...s,
+          messages: [...s.messages, ...newMessages],
+          updatedAt: newMessages[newMessages.length - 1].timestamp,
+        };
+      })
+    );
+  } catch (err) {
+    console.error("❌ Load staff conversation failed", err);
+  }
+};
+
+const sendStaffMessage = async (session) => {
+  console.log("🧪 sendStaffMessage debug", {
+  currentUserId,
+  session,
+  staffId: session?.staffId,
+});
+
+  if (!inputValue.trim()) return;
+
+  if (!currentUserId || !session?.staffId) {
+    setLastError("Missing sender or receiver");
+    return;
+  }
+
+  const payload = {
+    senderId: currentUserId,
+    receiverId: Number(session.staffId),
+    content: inputValue.trim(),
+  };
+
+  console.log("📤 STAFF PAYLOAD", payload);
+
+  const tempMsg = {
+    id: `temp-${Date.now()}`,
+    role: "user",
+    text: payload.content,
+    timestamp: nowIso(),
+  };
+
+  setInputValue("");
+
+  setSessions(prev =>
+    prev.map(s =>
+      s.id === session.id
+        ? { ...s, messages: [...s.messages, tempMsg] }
+        : s
+    )
+  );
+
+  try {
+    await userChatApi.sendMessage(payload);
+  } catch (err) {
+    console.error("❌ Staff send failed", err);
+    setLastError("Send message failed");
+  }
+};
+
+
 
   const handleSend = useCallback(async () => {
+     const currentSession = sessions.find(s => s.id === activeSessionId);
+
+  // ✅ HARD BLOCK AI IF STAFF CHAT
+  if (currentSession?.type === "staff") {
+    if (!inputValue.trim()) {
+      setLastError("Please enter a message for staff");
+      return;
+    }
+
+    await sendStaffMessage(currentSession);
+    return; // ❌ TUYỆT ĐỐI KHÔNG CHẠY CODE AI
+  }
     if (sending) return;
     const text = inputValue.trim();
 
@@ -652,7 +895,6 @@ const ChatPage = () => {
       text: cvFile && !text ? `${question}\n(CV: ${cvFile.name})` : question,
       timestamp: nowIso(),
     };
-
     setSessions((prev) => {
       let updatedSessionId = sessionId;
       let updatedSessions;
@@ -719,7 +961,9 @@ const ChatPage = () => {
       if (cvFile) {
         formData.append("file", cvFile);
       }
-
+      if (currentSession?.type === "staff") {
+  throw new Error("Staff session must not call AI");
+}
       const response = await fetch(`${ragBaseUrl}/chat`, {
         method: "POST",
         headers: {
@@ -806,7 +1050,7 @@ const ChatPage = () => {
     } finally {
       setSending(false);
     }
-  }, [sending, inputValue, activeSessionId, ragBaseUrl, t, cvFile, clearCvFile]);
+  }, [sending, inputValue, activeSessionId, ragBaseUrl, t, cvFile, clearCvFile,sendStaffMessage,]);
 
   const handleSuggestionClick = (suggestion) => {
     setInputValue(suggestion);
@@ -841,10 +1085,27 @@ const ChatPage = () => {
               {t("chat_new_session")}
             </button>
             <button
-    className="staff-chat-btn"
-    type="button"
-    onClick={() => navigate("/chat/staff")}
-  >Chat with staff</button>
+  className="staff-chat-btn"
+  type="button"
+  onClick={() => {
+    const staff = pickStaffRoundRobin(staffList);
+
+    if (!staff) {
+      setLastError("No staff available");
+      return;
+    }
+
+    const session = createStaffSession(staff);
+    if (!session) return;
+
+    setSessions(prev => [session, ...prev]);
+    setActiveSessionId(session.id);
+  }}
+>
+  Chat with staff
+</button>
+
+
             <button
               className="refresh-history-btn"
               onClick={refreshHistory}
@@ -858,9 +1119,11 @@ const ChatPage = () => {
           <div className="session-list">
             {sessions.map((session, index) => {
               const displayTitle =
-                session.origin === "local"
-                  ? getSessionTitle(t, index + 1)
-                  : session.title || getSessionTitle(t, index + 1);
+  session.type === "staff"
+    ? session.title
+    : session.origin === "local"
+    ? getSessionTitle(t, index + 1)
+    : session.title || getSessionTitle(t, index + 1);
 
               return (
                 <div key={session.id} className="session-row">
