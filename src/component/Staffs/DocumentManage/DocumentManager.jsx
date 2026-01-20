@@ -4,6 +4,13 @@ import ojtDocumentApi from "../../API/OjtDocumentAPI";
 import semesterApi from "../../API/SemesterAPI";
 import { useAuth } from "../../Hook/useAuth";
 
+const DEFAULT_RAG_BASE = "https://ojt-rag-python.onrender.com";
+
+const sanitizeBaseUrl = (value) => {
+  if (!value || typeof value !== "string") return "";
+  return value.trim().replace(/\/$/, "");
+};
+
 const DocumentManager = () => {
   const { authUser } = useAuth();
 
@@ -33,6 +40,34 @@ const DocumentManager = () => {
     isGeneral: true,
     file: null,
   });
+
+  const [appConfig, setAppConfig] = useState(null);
+  const [syncingNow, setSyncingNow] = useState(false);
+  const [syncNotice, setSyncNotice] = useState("");
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadConfig = async () => {
+      try {
+        const response = await fetch("/app-config.json", { cache: "no-store" });
+        if (!response.ok) return;
+        const json = await response.json();
+        if (isMounted) setAppConfig(json || {});
+      } catch {
+        if (isMounted) setAppConfig({});
+      }
+    };
+    loadConfig();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const ragBaseUrl = useMemo(() => {
+    const env = process.env.REACT_APP_RAG_API_BASE_URL;
+    const runtime = appConfig?.ragApiBaseUrl;
+    return sanitizeBaseUrl(env || runtime || DEFAULT_RAG_BASE);
+  }, [appConfig]);
 
   useEffect(() => {
     let cancelled = false;
@@ -193,6 +228,47 @@ const DocumentManager = () => {
     setDocuments(sortDocumentsById(list));
   };
 
+  const syncNow = async () => {
+    if (syncingNow) return;
+    if (!ragBaseUrl) {
+      setSyncNotice("Sync is unavailable (missing RAG base URL).");
+      return;
+    }
+
+    setSyncingNow(true);
+    setSyncNotice("Syncing latest data… This may take a few minutes.");
+
+    try {
+      const response = await fetch(`${ragBaseUrl}/SyncNow`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      });
+
+      const contentType = response.headers.get("content-type") || "";
+      const payload = contentType.includes("application/json")
+        ? await response.json()
+        : await response.text();
+
+      if (!response.ok) {
+        const message =
+          typeof payload === "string"
+            ? payload
+            : payload?.message || payload?.error || `HTTP ${response.status}`;
+        throw new Error(message);
+      }
+
+      const message =
+        typeof payload === "string"
+          ? payload
+          : payload?.message || payload?.status || "Sync started. Please wait a few minutes.";
+      setSyncNotice(String(message));
+    } catch (e) {
+      setSyncNotice(`Sync failed: ${e?.message || "Unknown error"}`);
+    } finally {
+      setSyncingNow(false);
+    }
+  };
+
   const validateFile = (file) => {
     if (!file) return "Please choose a file.";
     const name = String(file?.name || "").toLowerCase();
@@ -335,6 +411,15 @@ const DocumentManager = () => {
             <button className="btn-primary" type="button" onClick={() => setUploadOpen(true)}>
               Upload New Document
             </button>
+            <button
+              className="btn-secondary dm-sync-btn"
+              type="button"
+              onClick={syncNow}
+              disabled={syncingNow}
+              title="Sync latest data from the source"
+            >
+              {syncingNow ? "Syncing…" : "Sync now"}
+            </button>
             <input
               className="dm-search"
               value={search}
@@ -348,6 +433,10 @@ const DocumentManager = () => {
             <button className={`chip ${filter === "semester" ? "active" : ""}`} type="button" onClick={() => setFilter("semester")}>By Semester</button>
           </div>
         </div>
+
+        {(syncingNow || syncNotice) && (
+          <div className={`dm-sync-notice ${syncingNow ? "is-syncing" : ""}`}>{syncNotice}</div>
+        )}
 
         <table className="admin-table dm-table">
           <thead>

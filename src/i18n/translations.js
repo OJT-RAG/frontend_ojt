@@ -63,6 +63,9 @@ export const translations = {
     chat_session_untitled: 'Untitled session',
     chat_message_failed: 'The assistant could not answer this time. Please try again.',
     chat_service_checking: 'Checking assistant status…',
+    chat_model_rag: 'Model: RAG Mode',
+    chat_model_cv: 'Model: CV Analysis Mode',
+    chat_attach_cv: 'Import File',
 
     // RAG docs admin
     rag_admin_title: 'Manage RAG Documents',
@@ -329,6 +332,9 @@ export const translations = {
     chat_session_untitled: 'Phiên chưa đặt tên',
     chat_message_failed: 'Trợ lý chưa thể trả lời. Vui lòng thử lại.',
     chat_service_checking: 'Đang kiểm tra trạng thái trợ lý…',
+    chat_model_rag: 'Model: RAG Mode',
+    chat_model_cv: 'Model: CV Analysis Mode',
+    chat_attach_cv: 'Nhập file',
 
     // RAG docs admin
     rag_admin_title: 'Quản lý tài liệu RAG',
@@ -589,6 +595,9 @@ export const translations = {
     chat_session_untitled: '名称未設定のセッション',
     chat_message_failed: '今回は回答できませんでした。もう一度お試しください。',
     chat_service_checking: 'アシスタントの状態を確認中…',
+    chat_model_rag: 'Model: RAG Mode',
+    chat_model_cv: 'Model: CV Analysis Mode',
+    chat_attach_cv: 'ファイルをインポート',
 
     kb_hub: 'ナレッジハブ',
     kb_title: '包括的なナレッジベース',

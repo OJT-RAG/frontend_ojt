@@ -10,6 +10,7 @@ import { useI18n } from "../../i18n/i18n.jsx";
 import "./ChatPage.scss";
 import { useNavigate } from "react-router-dom";
 import chatRoomApi from "../API/chatRoomApi.js";
+import { FileText, Paperclip, Sparkles } from "lucide-react";
 
 const LOCAL_STORAGE_KEY = "ojt-rag-chat-sessions";
 const DEFAULT_RAG_BASE = "https://ojt-rag-python.onrender.com";
@@ -817,6 +818,13 @@ const ChatPage = () => {
     handleSend();
   };
 
+  const modelModeLabel = useMemo(() => {
+    if (cvFile) {
+      return (typeof t === "function" && t("chat_model_cv")) || "Model: CV Analysis Mode";
+    }
+    return (typeof t === "function" && t("chat_model_rag")) || "Model: RAG Mode";
+  }, [cvFile, t]);
+
   const statusLabel =
     serviceStatus.state === "online"
       ? t("chat_status_ready")
@@ -998,7 +1006,10 @@ const ChatPage = () => {
                 onClick={() => cvInputRef.current?.click()}
                 disabled={sending}
               >
-                {(typeof t === "function" && t("chat_attach_cv")) || "Attach CV"}
+                <Paperclip className="attach-icon" aria-hidden="true" />
+                <span className="attach-label">
+                  {(typeof t === "function" && t("chat_attach_cv")) || "Import File"}
+                </span>
               </button>
 
               {cvFile && (
@@ -1016,6 +1027,18 @@ const ChatPage = () => {
                   </button>
                 </div>
               )}
+            </div>
+
+            <div
+              className={cn("chatpage-model-badge", cvFile ? "is-cv" : "is-rag")}
+              role="note"
+              aria-label={modelModeLabel}
+              title={modelModeLabel}
+            >
+              <span className="model-icon" aria-hidden="true">
+                {cvFile ? <FileText size={16} /> : <Sparkles size={16} />}
+              </span>
+              <span className="model-text">{modelModeLabel}</span>
             </div>
 
             <div className="chatpage-input-row">
