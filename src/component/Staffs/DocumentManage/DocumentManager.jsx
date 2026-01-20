@@ -169,7 +169,7 @@ const DocumentManager = () => {
     };
 
     tick();
-    intervalId = window.setInterval(tick, 5000);
+    intervalId = window.setInterval(tick, 10000);
 
     return () => {
       cancelled = true;
