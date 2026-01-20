@@ -45,6 +45,9 @@ const DocumentManager = () => {
   const [syncingNow, setSyncingNow] = useState(false);
   const [syncNotice, setSyncNotice] = useState("");
 
+  const [tagsByDocId, setTagsByDocId] = useState({});
+  const [tagsLoadingByDocId, setTagsLoadingByDocId] = useState({});
+
   useEffect(() => {
     let isMounted = true;
     const loadConfig = async () => {
@@ -228,6 +231,66 @@ const DocumentManager = () => {
     setDocuments(sortDocumentsById(list));
   };
 
+  const getCachedTags = (docId) => {
+    const key = String(docId);
+    return Object.prototype.hasOwnProperty.call(tagsByDocId, key) ? tagsByDocId[key] : null;
+  };
+
+  const loadTagsForDocument = async (docId) => {
+    const key = String(docId);
+    if (tagsLoadingByDocId[key]) return getCachedTags(docId) || [];
+
+    try {
+      setTagsLoadingByDocId((prev) => ({ ...prev, [key]: true }));
+      const res = await ojtDocumentApi.getTags(docId);
+      const list = Array.isArray(res?.data) ? res.data : res?.data?.data;
+      const tags = Array.isArray(list) ? list : [];
+      setTagsByDocId((prev) => ({ ...prev, [key]: tags }));
+      return tags;
+    } catch (e) {
+      const status = e?.response?.status;
+      const serverMessage = e?.response?.data?.message || e?.response?.data?.title;
+      window.alert(serverMessage || (status ? `Failed to load tags (HTTP ${status})` : e?.message || "Failed to load tags"));
+      setTagsByDocId((prev) => ({ ...prev, [key]: [] }));
+      return [];
+    } finally {
+      setTagsLoadingByDocId((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const addTagToDocument = async (docId) => {
+    const raw = window.prompt("Enter Document Tag ID to add:", "");
+    if (raw == null) return;
+    const tagId = Number(String(raw).trim());
+    if (!Number.isFinite(tagId) || tagId <= 0) {
+      window.alert("Invalid tag id.");
+      return;
+    }
+    try {
+      await ojtDocumentApi.addTag(docId, tagId);
+      await loadTagsForDocument(docId);
+    } catch (e) {
+      const status = e?.response?.status;
+      const serverMessage = e?.response?.data?.message || e?.response?.data?.title;
+      window.alert(serverMessage || (status ? `Add tag failed (HTTP ${status})` : e?.message || "Add tag failed"));
+    }
+  };
+
+  const removeTagFromDocument = async (docId, tag) => {
+    const tagId = tag?.documenttagId ?? tag?.documentTagId ?? tag?.id;
+    if (!tagId) return;
+    const ok = window.confirm(`Remove tag #${tagId} from document #${docId}?`);
+    if (!ok) return;
+    try {
+      await ojtDocumentApi.removeTag(docId, tagId);
+      await loadTagsForDocument(docId);
+    } catch (e) {
+      const status = e?.response?.status;
+      const serverMessage = e?.response?.data?.message || e?.response?.data?.title;
+      window.alert(serverMessage || (status ? `Remove tag failed (HTTP ${status})` : e?.message || "Remove tag failed"));
+    }
+  };
+
   const syncNow = async () => {
     if (syncingNow) return;
     if (!ragBaseUrl) {
@@ -372,10 +435,23 @@ const DocumentManager = () => {
     const ok = window.confirm(`Delete document #${docId}?`);
     if (!ok) return;
 
+    // Must remove tags before deleting
+    const existingTags = getCachedTags(docId);
+    const tags = existingTags == null ? await loadTagsForDocument(docId) : existingTags;
+    if (Array.isArray(tags) && tags.length > 0) {
+      window.alert("Please remove this document's tags before deleting it.");
+      return;
+    }
+
     try {
       await ojtDocumentApi.delete(docId);
       setDocuments((prev) => sortDocumentsById((prev || []).filter((d) => getDocId(d) !== docId)));
       if (getDocId(editingDoc) === docId) closeEdit();
+      setTagsByDocId((prev) => {
+        const copy = { ...prev };
+        delete copy[String(docId)];
+        return copy;
+      });
     } catch (e) {
       const status = e?.response?.status;
       const serverMessage = e?.response?.data?.message || e?.response?.data?.title;
@@ -445,6 +521,7 @@ const DocumentManager = () => {
               <th>Title</th>
               <th>Semester</th>
               <th>General</th>
+              <th>Tags</th>
               <th>Uploaded By</th>
               <th>Actions</th>
             </tr>
@@ -452,15 +529,15 @@ const DocumentManager = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6}>Loading...</td>
+                <td colSpan={7}>Loading...</td>
               </tr>
             ) : error ? (
               <tr>
-                <td colSpan={6}>{error}</td>
+                <td colSpan={7}>{error}</td>
               </tr>
             ) : filteredDocuments.length === 0 ? (
               <tr>
-                <td colSpan={6}>No documents found.</td>
+                <td colSpan={7}>No documents found.</td>
               </tr>
             ) : (
               filteredDocuments.map((doc, idx) => {
@@ -469,6 +546,9 @@ const DocumentManager = () => {
                 const semesterName = semesterNameById.get(Number(semesterId)) || semesterId || "-";
                 const url = doc?.fileUrl;
                 const actionsDisabled = !id;
+                const tagKey = id != null ? String(id) : "";
+                const tags = id != null ? getCachedTags(id) : null;
+                const tagsLoading = !!(id != null && tagsLoadingByDocId[tagKey]);
 
                 return (
                   <tr key={id ?? `doc-row-${idx}`}>
@@ -484,6 +564,58 @@ const DocumentManager = () => {
                     </td>
                     <td>{semesterName}</td>
                     <td>{doc?.isGeneral ? "Yes" : "No"}</td>
+                    <td>
+                      <div className="dm-tags">
+                        {actionsDisabled ? (
+                          <span className="dm-tags-empty">-</span>
+                        ) : tags == null ? (
+                          <button
+                            className="btn-secondary dm-tags-load"
+                            type="button"
+                            onClick={() => loadTagsForDocument(id)}
+                            disabled={tagsLoading}
+                          >
+                            {tagsLoading ? "Loading…" : "Load tags"}
+                          </button>
+                        ) : tags.length === 0 ? (
+                          <span className="dm-tags-empty">—</span>
+                        ) : (
+                          <div className="dm-tag-list">
+                            {tags.map((tag) => {
+                              const tagId = tag?.documenttagId ?? tag?.documentTagId ?? tag?.id;
+                              const tagName = typeof tag?.name === "string" ? tag.name : "";
+                              const chipLabel = tagName ? `#${tagId} ${tagName}` : `#${tagId}`;
+                              return (
+                                <span key={`tag-${id}-${tagId}`} className="dm-tag-chip" title={chipLabel}
+                                >
+                                  <span className="dm-tag-name">{chipLabel}</span>
+                                  <button
+                                    type="button"
+                                    className="dm-tag-remove"
+                                    onClick={() => removeTagFromDocument(id, tag)}
+                                    title="Remove tag"
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {!actionsDisabled && (
+                          <button
+                            className="btn-secondary dm-tag-add"
+                            type="button"
+                            onClick={() => addTagToDocument(id)}
+                            disabled={tagsLoading}
+                            title="Add tag by id"
+                          >
+                            + Tag
+                          </button>
+                        )}
+                      </div>
+                    </td>
                     <td>{doc?.uploadedBy ?? "-"}</td>
                     <td className="dm-actions">
                       {url && (

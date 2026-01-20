@@ -72,6 +72,88 @@
     flex-wrap: wrap;
   }
 
+  .dm-sync-btn {
+    white-space: nowrap;
+  }
+
+  .dm-sync-notice {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(148, 163, 184, 0.45);
+    background: rgba(248, 250, 252, 0.85);
+    color: #334155;
+    font-size: 0.9rem;
+    font-weight: 600;
+  }
+
+  .dm-sync-notice.is-syncing {
+    border-color: rgba(59, 130, 246, 0.35);
+    background: rgba(239, 246, 255, 0.85);
+    color: #1d4ed8;
+  }
+
+  .dm-tags {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    min-width: 220px;
+  }
+
+  .dm-tag-list {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .dm-tag-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(148, 163, 184, 0.45);
+    background: rgba(255, 255, 255, 0.9);
+    color: #0f172a;
+    font-size: 0.85rem;
+    font-weight: 600;
+    max-width: 260px;
+  }
+
+  .dm-tag-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .dm-tag-remove {
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    border: none;
+    background: rgba(239, 68, 68, 0.14);
+    color: #b91c1c;
+    cursor: pointer;
+    font-weight: 800;
+    line-height: 1;
+  }
+
+  .dm-tag-remove:hover {
+    background: rgba(239, 68, 68, 0.22);
+  }
+
+  .dm-tags-empty {
+    color: #64748b;
+    font-weight: 600;
+  }
+
+  .dm-tags-load,
+  .dm-tag-add {
+    white-space: nowrap;
+  }
+
   .dm-modal-overlay {
     position: fixed;
     inset: 0;
