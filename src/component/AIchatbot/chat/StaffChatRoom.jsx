@@ -1,7 +1,6 @@
 import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import userChatApi from "../../API/UserChatAPI.js";
-import useChatHub from "../../Hook/useChathub.js";
 import userApi from "../../API/UserAPI";
 
 import "./StaffChatRoom.scss";
@@ -98,7 +97,6 @@ const StaffChatRoom = () => {
 }, [currentUserId, staffId]);
 
 
-  useChatHub(currentUserId, handleIncomingMessage);
 
   /* =======================
      🚀 INIT + POLLING

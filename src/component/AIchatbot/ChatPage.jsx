@@ -12,7 +12,7 @@ import { useNavigate } from "react-router-dom";
 import chatRoomApi from "../API/chatRoomApi.js";
 import userApi from "../API/UserAPI.js";
 import userChatApi from "../API/UserChatAPI";
-import useChatHub from "../Hook/useChathub.js";
+
 import { FileText, Paperclip, Sparkles } from "lucide-react";
 
 const LOCAL_STORAGE_KEY = "ojt-rag-chat-sessions";
@@ -756,17 +756,22 @@ useEffect(() => {
     setCvFile(file);
   }, [t]);
   useEffect(() => {
-  if (!activeSession || activeSession.type !== "staff") return;
+  if (!activeSession || activeSession.type !== "staff" || !activeSession.staffId) return;
 
   // load lần đầu
   loadStaffConversation(activeSession);
 
-  const timer = setInterval(() => {
-    loadStaffConversation(activeSession);
-  }, 3000); // 3s polling
+const staffId = activeSession.staffId;
+  const sessionId = activeSession.id;
 
+  const timer = setInterval(() => {
+    loadStaffConversation({
+      id: sessionId,
+      staffId,
+    });
+  }, 3000);
   return () => clearInterval(timer);
-}, [activeSessionId]);
+}, [activeSessionId, activeSession?.staffId]);
 
   const loadStaffConversation = async (session) => {
   if (!currentUserId || !session?.staffId) return;
@@ -833,22 +838,10 @@ const sendStaffMessage = async (session) => {
 
   console.log("📤 STAFF PAYLOAD", payload);
 
-  const tempMsg = {
-    id: `temp-${Date.now()}`,
-    role: "user",
-    text: payload.content,
-    timestamp: nowIso(),
-  };
-
+  
   setInputValue("");
 
-  setSessions(prev =>
-    prev.map(s =>
-      s.id === session.id
-        ? { ...s, messages: [...s.messages, tempMsg] }
-        : s
-    )
-  );
+
 
   try {
     await userChatApi.sendMessage(payload);
