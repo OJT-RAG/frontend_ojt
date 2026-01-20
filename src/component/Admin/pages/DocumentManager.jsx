@@ -1,8 +1,15 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import "./DocumentManager.scss";
 import ojtDocumentApi from "../../API/OjtDocumentAPI";
 import semesterApi from "../../API/SemesterAPI";
 import { useAuth } from "../../Hook/useAuth";
+
+const DEFAULT_RAG_BASE = "https://ojt-rag-python.onrender.com";
+
+const sanitizeBaseUrl = (value) => {
+  if (!value || typeof value !== "string") return "";
+  return value.trim().replace(/\/$/, "");
+};
 
 const DocumentManager = () => {
   const { authUser } = useAuth();
@@ -33,6 +40,142 @@ const DocumentManager = () => {
     isGeneral: true,
     file: null,
   });
+
+  const [appConfig, setAppConfig] = useState(null);
+  const [syncingNow, setSyncingNow] = useState(false);
+  const [syncNotice, setSyncNotice] = useState("");
+  const [syncStatus, setSyncStatus] = useState(null);
+  const [syncStatusError, setSyncStatusError] = useState("");
+  const [syncLastUpdatedAt, setSyncLastUpdatedAt] = useState(null);
+  const [syncPolling, setSyncPolling] = useState(false);
+  const [syncHasStarted, setSyncHasStarted] = useState(false);
+
+  const [tagsByDocId, setTagsByDocId] = useState({});
+  const [tagsLoadingByDocId, setTagsLoadingByDocId] = useState({});
+
+  useEffect(() => {
+    let isMounted = true;
+    const loadConfig = async () => {
+      try {
+        const response = await fetch("/app-config.json", { cache: "no-store" });
+        if (!response.ok) return;
+        const json = await response.json();
+        if (isMounted) setAppConfig(json || {});
+      } catch {
+        if (isMounted) setAppConfig({});
+      }
+    };
+    loadConfig();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
+  const ragBaseUrl = useMemo(() => {
+    const env = process.env.REACT_APP_RAG_API_BASE_URL;
+    const runtime = appConfig?.ragApiBaseUrl;
+    return sanitizeBaseUrl(env || runtime || DEFAULT_RAG_BASE);
+  }, [appConfig]);
+
+  const normalizeSyncStatus = (raw) => {
+    const obj = raw && typeof raw === "object" ? raw : {};
+    return {
+      is_running: !!(obj.is_running ?? obj.isRunning ?? obj.running),
+      current_step: obj.current_step ?? obj.currentStep ?? "",
+      progress: obj.progress ?? "",
+      percentage: obj.percentage ?? obj.percent ?? "",
+      last_finished: obj.last_finished ?? obj.lastFinished ?? null,
+    };
+  };
+
+  const fetchSyncStatus = useCallback(async () => {
+    if (!ragBaseUrl) throw new Error("Missing RAG base URL");
+
+    const response = await fetch(`${ragBaseUrl}/SyncStatus`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+
+    const contentType = response.headers.get("content-type") || "";
+    const payload = contentType.includes("application/json")
+      ? await response.json()
+      : await response.text();
+
+    if (!response.ok) {
+      const message =
+        typeof payload === "string"
+          ? payload
+          : payload?.message || payload?.error || `HTTP ${response.status}`;
+      throw new Error(message);
+    }
+
+    const status = normalizeSyncStatus(payload);
+    setSyncStatus(status);
+    setSyncLastUpdatedAt(Date.now());
+    setSyncStatusError("");
+    return status;
+  }, [ragBaseUrl]);
+
+  // Load current status once (useful if a sync was started elsewhere)
+  useEffect(() => {
+    let cancelled = false;
+    if (!ragBaseUrl) return undefined;
+    (async () => {
+      try {
+        const status = await fetchSyncStatus();
+        if (cancelled) return;
+        if (status?.is_running) {
+          setSyncingNow(true);
+          setSyncPolling(true);
+          setSyncHasStarted(true);
+          setSyncNotice((n) => n || "Syncing latest data… This may take a few minutes.");
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ragBaseUrl, fetchSyncStatus]);
+
+  // Poll /SyncStatus every 5 seconds while polling is enabled
+  useEffect(() => {
+    if (!syncPolling) return undefined;
+    if (!ragBaseUrl) return undefined;
+
+    let cancelled = false;
+    let intervalId = null;
+
+    const tick = async () => {
+      try {
+        const status = await fetchSyncStatus();
+        if (cancelled) return;
+
+        if (status?.is_running) {
+          setSyncHasStarted(true);
+        }
+
+        // Only auto-stop after we have observed the sync running at least once.
+        if (status && status.is_running === false && syncHasStarted) {
+          setSyncPolling(false);
+          setSyncingNow(false);
+          setSyncNotice((n) => (n && n.startsWith("Sync failed") ? n : "Sync finished."));
+        }
+      } catch (e) {
+        if (cancelled) return;
+        setSyncStatusError(e?.message || "Failed to fetch sync status");
+      }
+    };
+
+    tick();
+    intervalId = window.setInterval(tick, 60000);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) window.clearInterval(intervalId);
+    };
+  }, [syncPolling, ragBaseUrl, fetchSyncStatus, syncHasStarted]);
 
   useEffect(() => {
     let cancelled = false;
@@ -193,6 +336,119 @@ const DocumentManager = () => {
     setDocuments(sortDocumentsById(list));
   };
 
+  const getCachedTags = (docId) => {
+    const key = String(docId);
+    return Object.prototype.hasOwnProperty.call(tagsByDocId, key) ? tagsByDocId[key] : null;
+  };
+
+  const loadTagsForDocument = async (docId) => {
+    const key = String(docId);
+    if (tagsLoadingByDocId[key]) return getCachedTags(docId) || [];
+
+    try {
+      setTagsLoadingByDocId((prev) => ({ ...prev, [key]: true }));
+      const res = await ojtDocumentApi.getTags(docId);
+      const list = Array.isArray(res?.data) ? res.data : res?.data?.data;
+      const tags = Array.isArray(list) ? list : [];
+      setTagsByDocId((prev) => ({ ...prev, [key]: tags }));
+      return tags;
+    } catch (e) {
+      const status = e?.response?.status;
+      const serverMessage = e?.response?.data?.message || e?.response?.data?.title;
+      window.alert(serverMessage || (status ? `Failed to load tags (HTTP ${status})` : e?.message || "Failed to load tags"));
+      setTagsByDocId((prev) => ({ ...prev, [key]: [] }));
+      return [];
+    } finally {
+      setTagsLoadingByDocId((prev) => ({ ...prev, [key]: false }));
+    }
+  };
+
+  const addTagToDocument = async (docId) => {
+    const raw = window.prompt("Enter Document Tag ID to add:", "");
+    if (raw == null) return;
+    const tagId = Number(String(raw).trim());
+    if (!Number.isFinite(tagId) || tagId <= 0) {
+      window.alert("Invalid tag id.");
+      return;
+    }
+    try {
+      await ojtDocumentApi.addTag(docId, tagId);
+      await loadTagsForDocument(docId);
+    } catch (e) {
+      const status = e?.response?.status;
+      const serverMessage = e?.response?.data?.message || e?.response?.data?.title;
+      window.alert(serverMessage || (status ? `Add tag failed (HTTP ${status})` : e?.message || "Add tag failed"));
+    }
+  };
+
+  const removeTagFromDocument = async (docId, tag) => {
+    const tagId = tag?.documenttagId ?? tag?.documentTagId ?? tag?.id;
+    if (!tagId) return;
+    const ok = window.confirm(`Remove tag #${tagId} from document #${docId}?`);
+    if (!ok) return;
+    try {
+      await ojtDocumentApi.removeTag(docId, tagId);
+      await loadTagsForDocument(docId);
+    } catch (e) {
+      const status = e?.response?.status;
+      const serverMessage = e?.response?.data?.message || e?.response?.data?.title;
+      window.alert(serverMessage || (status ? `Remove tag failed (HTTP ${status})` : e?.message || "Remove tag failed"));
+    }
+  };
+
+  const syncNow = async () => {
+    if (syncingNow) return;
+    if (!ragBaseUrl) {
+      setSyncNotice("Sync is unavailable (missing RAG base URL).");
+      return;
+    }
+
+    setSyncingNow(true);
+    setSyncPolling(false);
+    setSyncHasStarted(false);
+    setSyncStatusError("");
+    setSyncNotice("Syncing latest data… This may take a few minutes.");
+
+    try {
+      const response = await fetch(`${ragBaseUrl}/SyncNow`, {
+        method: "GET",
+        headers: { Accept: "application/json" },
+      });
+
+      const contentType = response.headers.get("content-type") || "";
+      const payload = contentType.includes("application/json")
+        ? await response.json()
+        : await response.text();
+
+      if (!response.ok) {
+        const message =
+          typeof payload === "string"
+            ? payload
+            : payload?.message || payload?.error || `HTTP ${response.status}`;
+        throw new Error(message);
+      }
+
+      const message =
+        typeof payload === "string"
+          ? payload
+          : payload?.message || payload?.status || "Sync started. Please wait a few minutes.";
+      setSyncNotice(String(message));
+
+      // Start polling and fetch first status immediately.
+      setSyncPolling(true);
+      try {
+        const status = await fetchSyncStatus();
+        if (status?.is_running) setSyncHasStarted(true);
+      } catch {
+        // ignore (polling will keep trying)
+      }
+    } catch (e) {
+      setSyncNotice(`Sync failed: ${e?.message || "Unknown error"}`);
+      setSyncPolling(false);
+      setSyncingNow(false);
+    }
+  };
+
   const validateFile = (file) => {
     if (!file) return "Please choose a file.";
     const name = String(file?.name || "").toLowerCase();
@@ -296,10 +552,23 @@ const DocumentManager = () => {
     const ok = window.confirm(`Delete document #${docId}?`);
     if (!ok) return;
 
+    // Must remove tags before deleting
+    const existingTags = getCachedTags(docId);
+    const tags = existingTags == null ? await loadTagsForDocument(docId) : existingTags;
+    if (Array.isArray(tags) && tags.length > 0) {
+      window.alert("Please remove this document's tags before deleting it.");
+      return;
+    }
+
     try {
       await ojtDocumentApi.delete(docId);
       setDocuments((prev) => sortDocumentsById((prev || []).filter((d) => getDocId(d) !== docId)));
       if (getDocId(editingDoc) === docId) closeEdit();
+      setTagsByDocId((prev) => {
+        const copy = { ...prev };
+        delete copy[String(docId)];
+        return copy;
+      });
     } catch (e) {
       const status = e?.response?.status;
       const serverMessage = e?.response?.data?.message || e?.response?.data?.title;
@@ -335,6 +604,15 @@ const DocumentManager = () => {
             <button className="btn-primary" type="button" onClick={() => setUploadOpen(true)}>
               Upload New Document
             </button>
+            <button
+              className="btn-secondary dm-sync-btn"
+              type="button"
+              onClick={syncNow}
+              disabled={syncingNow}
+              title="Sync latest data from the source"
+            >
+              {syncingNow ? "Syncing…" : "Sync now"}
+            </button>
             <input
               className="dm-search"
               value={search}
@@ -349,6 +627,48 @@ const DocumentManager = () => {
           </div>
         </div>
 
+        {(syncingNow || syncNotice) && (
+          <div className={`dm-sync-notice ${syncingNow ? "is-syncing" : ""}`}>{syncNotice}</div>
+        )}
+
+        {(syncingNow || syncPolling) && (
+          <div className={`dm-sync-board ${syncingNow ? "is-syncing" : ""}`}>
+            <div className="dm-sync-board-header">
+              <div className="dm-sync-board-title">Sync progress</div>
+              <div className={`dm-sync-state ${syncStatus?.is_running ? "is-running" : ""}`}>
+                {syncStatus?.is_running ? "RUNNING" : "IDLE"}
+              </div>
+            </div>
+
+            {syncStatusError && <div className="dm-sync-error">{syncStatusError}</div>}
+
+            <table className="dm-sync-kv">
+              <tbody>
+                <tr>
+                  <th>Current step</th>
+                  <td>{syncStatus?.current_step || "-"}</td>
+                </tr>
+                <tr>
+                  <th>Progress</th>
+                  <td>{syncStatus?.progress || "-"}</td>
+                </tr>
+                <tr>
+                  <th>Percentage</th>
+                  <td>{syncStatus?.percentage || "-"}</td>
+                </tr>
+                <tr>
+                  <th>Last finished</th>
+                  <td>{syncStatus?.last_finished == null ? "-" : String(syncStatus.last_finished)}</td>
+                </tr>
+                <tr>
+                  <th>Updated</th>
+                  <td>{syncLastUpdatedAt ? new Date(syncLastUpdatedAt).toLocaleString() : "-"}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        )}
+
         <table className="admin-table dm-table">
           <thead>
             <tr>
@@ -356,6 +676,7 @@ const DocumentManager = () => {
               <th>Title</th>
               <th>Semester</th>
               <th>General</th>
+              <th>Tags</th>
               <th>Uploaded By</th>
               <th>Actions</th>
             </tr>
@@ -363,15 +684,15 @@ const DocumentManager = () => {
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6}>Loading...</td>
+                <td colSpan={7}>Loading...</td>
               </tr>
             ) : error ? (
               <tr>
-                <td colSpan={6}>{error}</td>
+                <td colSpan={7}>{error}</td>
               </tr>
             ) : filteredDocuments.length === 0 ? (
               <tr>
-                <td colSpan={6}>No documents found.</td>
+                <td colSpan={7}>No documents found.</td>
               </tr>
             ) : (
               filteredDocuments.map((doc, idx) => {
@@ -380,6 +701,9 @@ const DocumentManager = () => {
                 const semesterName = semesterNameById.get(Number(semesterId)) || semesterId || "-";
                 const url = doc?.fileUrl;
                 const actionsDisabled = !id;
+                const tagKey = id != null ? String(id) : "";
+                const tags = id != null ? getCachedTags(id) : null;
+                const tagsLoading = !!(id != null && tagsLoadingByDocId[tagKey]);
 
                 return (
                   <tr key={id ?? `doc-row-${idx}`}>
@@ -395,6 +719,58 @@ const DocumentManager = () => {
                     </td>
                     <td>{semesterName}</td>
                     <td>{doc?.isGeneral ? "Yes" : "No"}</td>
+                    <td>
+                      <div className="dm-tags">
+                        {actionsDisabled ? (
+                          <span className="dm-tags-empty">-</span>
+                        ) : tags == null ? (
+                          <button
+                            className="btn-secondary dm-tags-load"
+                            type="button"
+                            onClick={() => loadTagsForDocument(id)}
+                            disabled={tagsLoading}
+                          >
+                            {tagsLoading ? "Loading…" : "Load tags"}
+                          </button>
+                        ) : tags.length === 0 ? (
+                          <span className="dm-tags-empty">—</span>
+                        ) : (
+                          <div className="dm-tag-list">
+                            {tags.map((tag) => {
+                              const tagId = tag?.documenttagId ?? tag?.documentTagId ?? tag?.id;
+                              const tagName = typeof tag?.name === "string" ? tag.name : "";
+                              const chipLabel = tagName ? `#${tagId} ${tagName}` : `#${tagId}`;
+                              return (
+                                <span key={`tag-${id}-${tagId}`} className="dm-tag-chip" title={chipLabel}
+                                >
+                                  <span className="dm-tag-name">{chipLabel}</span>
+                                  <button
+                                    type="button"
+                                    className="dm-tag-remove"
+                                    onClick={() => removeTagFromDocument(id, tag)}
+                                    title="Remove tag"
+                                  >
+                                    ×
+                                  </button>
+                                </span>
+                              );
+                            })}
+                          </div>
+                        )}
+
+                        {!actionsDisabled && (
+                          <button
+                            className="btn-secondary dm-tag-add"
+                            type="button"
+                            onClick={() => addTagToDocument(id)}
+                            disabled={tagsLoading}
+                            title="Add tag by id"
+                          >
+                            + Tag
+                          </button>
+                        )}
+                      </div>
+                    </td>
                     <td>{doc?.uploadedBy ?? "-"}</td>
                     <td className="dm-actions">
                       {url && (

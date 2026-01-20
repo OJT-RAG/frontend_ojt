@@ -57,6 +57,22 @@ const SemesterManager = () => {
     });
   }, [semesters]);
 
+  const activeSemester = useMemo(() => {
+    return semesters.find((s) => s?.isActive === true) || null;
+  }, [semesters]);
+
+  const activeSemesterId = useMemo(() => {
+    const id = activeSemester?.semesterId ?? activeSemester?.semesterID ?? activeSemester?.id;
+    return Number(id) || 0;
+  }, [activeSemester]);
+
+  const validateSingleActive = (nextIsActive, editingSemesterId = 0) => {
+    if (!nextIsActive) return null;
+    if (!activeSemesterId) return null;
+    if (editingSemesterId && Number(editingSemesterId) === Number(activeSemesterId)) return null;
+    return 'Only one semester can be active at a time. Please deactivate the current active semester first.';
+  };
+
   const resetCreate = () => {
     setCreateForm({ name: '', startDate: '', endDate: '', isActive: false });
   };
@@ -106,6 +122,12 @@ const SemesterManager = () => {
       window.alert(msg);
       return;
     }
+
+    const activeMsg = validateSingleActive(!!createForm.isActive, 0);
+    if (activeMsg) {
+      window.alert(activeMsg);
+      return;
+    }
     try {
       const payload = {
         name: String(createForm.name).trim(),
@@ -133,6 +155,12 @@ const SemesterManager = () => {
     const msg = validateForm(editForm);
     if (msg) {
       window.alert(msg);
+      return;
+    }
+
+    const activeMsg = validateSingleActive(!!editForm.isActive, id);
+    if (activeMsg) {
+      window.alert(activeMsg);
       return;
     }
     try {
@@ -207,6 +235,7 @@ const SemesterManager = () => {
                     className="sm-input"
                     type="date"
                     value={createForm.startDate}
+                    max={createForm.endDate || undefined}
                     onChange={(e) => setCreateForm((p) => ({ ...p, startDate: e.target.value }))}
                   />
                 </td>
@@ -215,6 +244,7 @@ const SemesterManager = () => {
                     className="sm-input"
                     type="date"
                     value={createForm.endDate}
+                    min={createForm.startDate || undefined}
                     onChange={(e) => setCreateForm((p) => ({ ...p, endDate: e.target.value }))}
                   />
                 </td>
@@ -223,7 +253,16 @@ const SemesterManager = () => {
                     <input
                       type="checkbox"
                       checked={createForm.isActive}
-                      onChange={(e) => setCreateForm((p) => ({ ...p, isActive: e.target.checked }))}
+                      disabled={!!activeSemesterId}
+                      onChange={(e) => {
+                        const next = e.target.checked;
+                        const activeMsg = validateSingleActive(next, 0);
+                        if (activeMsg) {
+                          window.alert(activeMsg);
+                          return;
+                        }
+                        setCreateForm((p) => ({ ...p, isActive: next }));
+                      }}
                     />
                     Active
                   </label>
@@ -251,6 +290,8 @@ const SemesterManager = () => {
               sortedSemesters.map((s) => {
                 const isEditing = editingId === s.semesterId;
                 const statusBadge = s.isActive ? 'active' : 'closed';
+                const semesterId = Number(s?.semesterId ?? s?.semesterID ?? s?.id) || 0;
+                const disableActiveToggle = !!activeSemesterId && activeSemesterId !== semesterId;
 
                 return (
                   <tr key={s.semesterId} className={`semester-row ${isEditing ? 'editing' : ''}`}>
@@ -271,6 +312,7 @@ const SemesterManager = () => {
                           className="sm-input"
                           type="date"
                           value={editForm.startDate}
+                          max={editForm.endDate || undefined}
                           onChange={(e) => setEditForm((p) => ({ ...p, startDate: e.target.value }))}
                         />
                       ) : (
@@ -283,6 +325,7 @@ const SemesterManager = () => {
                           className="sm-input"
                           type="date"
                           value={editForm.endDate}
+                          min={editForm.startDate || undefined}
                           onChange={(e) => setEditForm((p) => ({ ...p, endDate: e.target.value }))}
                         />
                       ) : (
@@ -295,7 +338,16 @@ const SemesterManager = () => {
                           <input
                             type="checkbox"
                             checked={editForm.isActive}
-                            onChange={(e) => setEditForm((p) => ({ ...p, isActive: e.target.checked }))}
+                            disabled={disableActiveToggle}
+                            onChange={(e) => {
+                              const next = e.target.checked;
+                              const activeMsg = validateSingleActive(next, semesterId);
+                              if (activeMsg) {
+                                window.alert(activeMsg);
+                                return;
+                              }
+                              setEditForm((p) => ({ ...p, isActive: next }));
+                            }}
                           />
                           Active
                         </label>
