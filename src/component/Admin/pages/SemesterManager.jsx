@@ -235,6 +235,7 @@ const SemesterManager = () => {
                     className="sm-input"
                     type="date"
                     value={createForm.startDate}
+                    max={createForm.endDate || undefined}
                     onChange={(e) => setCreateForm((p) => ({ ...p, startDate: e.target.value }))}
                   />
                 </td>
@@ -243,6 +244,7 @@ const SemesterManager = () => {
                     className="sm-input"
                     type="date"
                     value={createForm.endDate}
+                    min={createForm.startDate || undefined}
                     onChange={(e) => setCreateForm((p) => ({ ...p, endDate: e.target.value }))}
                   />
                 </td>
@@ -310,6 +312,7 @@ const SemesterManager = () => {
                           className="sm-input"
                           type="date"
                           value={editForm.startDate}
+                          max={editForm.endDate || undefined}
                           onChange={(e) => setEditForm((p) => ({ ...p, startDate: e.target.value }))}
                         />
                       ) : (
@@ -322,6 +325,7 @@ const SemesterManager = () => {
                           className="sm-input"
                           type="date"
                           value={editForm.endDate}
+                          min={editForm.startDate || undefined}
                           onChange={(e) => setEditForm((p) => ({ ...p, endDate: e.target.value }))}
                         />
                       ) : (
