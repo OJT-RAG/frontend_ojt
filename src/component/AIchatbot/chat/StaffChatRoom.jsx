@@ -1,7 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import userChatApi from "../../API/UserChatAPI.js";
 import useChatHub from "../../Hook/useChathub.js";
+import userApi from "../../API/UserAPI";
+
 import "./StaffChatRoom.scss";
 
 const POLL_INTERVAL = 3000; // Fallback polling every 3 seconds
@@ -43,7 +45,7 @@ const findUserFromLocalStorage = () => {
 const StaffChatRoom = () => {
   const { staffId } = useParams();
   const navigate = useNavigate();
-
+  const [otherUser, setOtherUser] = useState(null);
   const user = findUserFromLocalStorage();
   const currentUserId = user ? Number(user.id) : null;
 
@@ -55,56 +57,46 @@ const StaffChatRoom = () => {
 
   const bottomRef = useRef(null);
   const prevCountRef = useRef(0);
-  const lastMessageIdRef = useRef(null);
+  const loadOtherUser = useCallback(async () => {
+  try {
+    const res = await userApi.getById(Number(staffId));
+    const data = res?.data?.data || res?.data;
+
+    if (data) {
+      setOtherUser({
+        id: data.userId,
+        name: data.fullname || data.email || "Staff",
+      });
+    }
+  } catch (err) {
+    console.error("❌ Failed to load other user", err);
+  }
+}, [staffId]);
 
   /* =======================
      📡 SIGNALR REALTIME
   ======================= */
-  const handleIncomingMessage = (message) => {
-    console.log("📨 SignalR message received:", message);
-    setSignalRActive(true); // Mark SignalR as working
+  const handleIncomingMessage = useCallback((message) => {
+  console.log("📨 SignalR message received:", message);
+  setSignalRActive(true);
 
-    const otherUserId = Number(staffId);
+  const otherUserId = Number(staffId);
 
-    const isRelated =
-      (message.senderId === currentUserId &&
-        message.receiverId === otherUserId) ||
-      (message.senderId === otherUserId &&
-        message.receiverId === currentUserId);
+  const isRelated =
+    (message.senderId === currentUserId &&
+      message.receiverId === otherUserId) ||
+    (message.senderId === otherUserId &&
+      message.receiverId === currentUserId);
 
-    console.log("🔍 Message relevance check:", {
-      isRelated,
-      messageSenderId: message.senderId,
-      messageReceiverId: message.receiverId,
-      currentUserId,
-      otherUserId,
-    });
+  if (!isRelated) return;
 
-    if (!isRelated) {
-      console.log("❌ Message not for this conversation");
-      return;
-    }
+  setMessages((prev) => {
+    const exists = prev.some((m) => m.id === message.id);
+    if (exists) return prev;
+    return [...prev, message];
+  });
+}, [currentUserId, staffId]);
 
-    console.log("✅ Adding message to state via SignalR");
-
-    setMessages((prev) => {
-      // Prevent duplicates
-      const exists = prev.some(
-        (m) =>
-          m.id === message.id ||
-          (m.content === message.content &&
-            m.senderId === message.senderId &&
-            Math.abs(new Date(m.timestamp || m.createdAt) - new Date(message.timestamp || message.createdAt)) < 1000)
-      );
-
-      if (exists) {
-        console.log("⚠️ Duplicate message, skipping");
-        return prev;
-      }
-
-      return [...prev, message];
-    });
-  };
 
   useChatHub(currentUserId, handleIncomingMessage);
 
@@ -112,98 +104,73 @@ const StaffChatRoom = () => {
      🚀 INIT + POLLING
   ======================= */
   useEffect(() => {
-    console.group("🧪 StaffChatRoom INIT");
-    console.log("currentUserId:", currentUserId);
-    console.log("staffId:", staffId);
-    console.groupEnd();
+  console.group("🧪 StaffChatRoom INIT");
+  console.log("currentUserId:", currentUserId);
+  console.log("staffId:", staffId);
+  console.groupEnd();
 
-    if (!currentUserId) {
-      setError("❌ Cannot detect logged-in user");
-      setLoading(false);
-      return;
+  if (!currentUserId) {
+    setError("❌ Cannot detect logged-in user");
+    setLoading(false);
+    return;
+  }
+
+  if (!staffId) {
+    setError("❌ Missing staffId");
+    setLoading(false);
+    return;
+  }
+
+  // ✅ LOAD USER NAME
+  loadOtherUser();
+
+  // ✅ LOAD MESSAGES
+  loadConversation();
+
+  const pollTimer = setInterval(() => {
+    if (!signalRActive) {
+      loadConversation(true);
     }
+  }, POLL_INTERVAL);
 
-    if (!staffId) {
-      setError("❌ Missing staffId");
-      setLoading(false);
-      return;
-    }
+  return () => clearInterval(pollTimer);
+}, [staffId, currentUserId, loadOtherUser]);
 
-    // Initial load
-    loadConversation();
-
-    // 🔄 Fallback polling (in case SignalR fails)
-    const pollTimer = setInterval(() => {
-      if (!signalRActive) {
-        console.log("🔄 Polling fallback (SignalR inactive)");
-        loadConversation(true); // Silent reload
-      } else {
-        console.log("✅ SignalR active, skipping poll");
-      }
-    }, POLL_INTERVAL);
-
-    // Reset SignalR status every 10 seconds to re-check
-    const resetTimer = setInterval(() => {
-      setSignalRActive(false);
-    }, 10000);
-
-    return () => {
-      clearInterval(pollTimer);
-      clearInterval(resetTimer);
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [staffId]);
 
   /* =======================
      📥 LOAD CHAT
   ======================= */
   const loadConversation = async (silent = false) => {
-    try {
-      if (!silent) {
-        setLoading(true);
-        setError("");
-      }
-
-      console.log("📥 Load conversation:", currentUserId, staffId);
-
-      const res = await userChatApi.getConversation(
-        currentUserId,
-        Number(staffId)
-      );
-
-      const data =
-        Array.isArray(res?.data)
-          ? res.data
-          : Array.isArray(res?.data?.data)
-          ? res.data.data
-          : [];
-
-      console.log("📨 Messages loaded:", data.length);
-
-      // Only update if there are actual changes
-      setMessages((prev) => {
-        const lastId = data[data.length - 1]?.id;
-        if (lastId === lastMessageIdRef.current) {
-          console.log("⏭️ No new messages, skipping update");
-          return prev;
-        }
-        lastMessageIdRef.current = lastId;
-        return data;
-      });
-    } catch (err) {
-      console.error(
-        "❌ Load conversation failed:",
-        err.response?.data || err
-      );
-      if (!silent) {
-        setError("Failed to load conversation");
-      }
-    } finally {
-      if (!silent) {
-        setLoading(false);
-      }
+  try {
+    if (!silent) {
+      setLoading(true);
+      setError("");
     }
-  };
+
+    const res = await userChatApi.getConversation(
+      currentUserId,
+      Number(staffId)
+    );
+
+    const data =
+      Array.isArray(res?.data)
+        ? res.data
+        : Array.isArray(res?.data?.data)
+        ? res.data.data
+        : [];
+
+    setMessages(prev => {
+      const map = new Map(prev.map(m => [m.id, m]));
+      data.forEach(m => map.set(m.id, m));
+      return Array.from(map.values());
+    });
+  } catch (err) {
+    if (!silent) setError("Failed to load conversation");
+  } finally {
+    if (!silent) setLoading(false);
+  }
+};
+
 
   /* =======================
      ⬇️ AUTO SCROLL (SMART)
@@ -232,6 +199,7 @@ const StaffChatRoom = () => {
 
     const tempMessage = {
       id: `temp-${Date.now()}`,
+      isTemp: true,
       ...payload,
       timestamp: new Date().toISOString(),
     };
@@ -247,9 +215,13 @@ const StaffChatRoom = () => {
       // SignalR should add the real message, or polling will catch it
       // Remove temp message after 2 seconds if real one arrives
       setTimeout(() => {
-        setMessages((prev) =>
-          prev.filter((m) => !m.id?.toString().startsWith("temp-"))
-        );
+        setMessages(prev =>
+  prev.filter(m =>
+    !(String(m.id).startsWith("temp-") &&
+      m.content === payload.content)
+  )
+);
+
       }, 2000);
     } catch (err) {
       console.error(
@@ -258,9 +230,11 @@ const StaffChatRoom = () => {
       );
 
       // Remove optimistic message on failure
-      setMessages((prev) =>
-        prev.filter((m) => m.id !== tempMessage.id)
-      );
+      setMessages(prev =>
+  prev.filter(m => !(m.isTemp && m.content === payload.content))
+);
+
+
 
       alert("Send message failed – check console");
     }
@@ -276,8 +250,18 @@ const StaffChatRoom = () => {
           <header className="staff-chatroom-header">
             <button onClick={() => navigate(-1)}>← Back</button>
             <div className="connection-status">
-              {signalRActive ? "🟢 Real-time" : "🟡 Polling"}
-            </div>
+  {otherUser ? (
+    <>
+      <span>
+        {signalRActive ? "🟢" : "🟡"} Chatting with {otherUser.name}
+      </span>
+    </>
+  ) : (
+    "🟡 Loading user..."
+  )}
+</div>
+
+
           </header>
 
           {loading && (
