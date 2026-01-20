@@ -1,26 +1,26 @@
 import { useEffect } from "react";
 import chatHubService from "../../signalr/chatHub";
 
-// export default function useChatHub(userId, onMessage) {
-//   useEffect(() => {
-//     if (!userId) return;
+export default function useChatHub(userId, onMessage) {
+  useEffect(() => {
+    if (!userId) return;
 
-//     let isMounted = true;
+    let isMounted = true;
 
-//     const start = async () => {
-//       await chatHubService.connect(userId);
+    const start = async () => {
+      await chatHubService.connect(userId);
 
-//       if (!isMounted) return;
+      if (!isMounted) return;
 
-//       chatHubService.subscribe(onMessage);
-//     };
+      chatHubService.subscribe(onMessage);
+    };
 
-//     start();
+    start();
 
-//     return () => {
-//       isMounted = false;
-//       chatHubService.unsubscribe(onMessage);
-//       chatHubService.disconnect?.(); // 👈 nếu có
-//     };
-//   }, [userId, onMessage]);
-// }
+    return () => {
+      isMounted = false;
+      chatHubService.unsubscribe(onMessage);
+      chatHubService.disconnect?.(); // 👈 nếu có
+    };
+  }, [userId, onMessage]);
+}

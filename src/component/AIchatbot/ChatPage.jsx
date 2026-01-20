@@ -12,7 +12,7 @@ import { useNavigate } from "react-router-dom";
 import chatRoomApi from "../API/chatRoomApi.js";
 import userApi from "../API/UserAPI.js";
 import userChatApi from "../API/UserChatAPI";
-import useChatHub from "../Hook/useChathub.js";
+
 
 const LOCAL_STORAGE_KEY = "ojt-rag-chat-sessions";
 const DEFAULT_RAG_BASE = "https://ojt-rag-python.onrender.com";
@@ -812,10 +812,10 @@ useEffect(() => {
 
 const sendStaffMessage = async (session) => {
   console.log("🧪 sendStaffMessage debug", {
-  currentUserId,
-  session,
-  staffId: session?.staffId,
-});
+    currentUserId,
+    session,
+    staffId: session?.staffId,
+  });
 
   if (!inputValue.trim()) return;
 
@@ -832,30 +832,18 @@ const sendStaffMessage = async (session) => {
 
   console.log("📤 STAFF PAYLOAD", payload);
 
-  const tempMsg = {
-    id: `temp-${Date.now()}`,
-    role: "user",
-    text: payload.content,
-    timestamp: nowIso(),
-  };
-
-  setInputValue("");
-
-  setSessions(prev =>
-    prev.map(s =>
-      s.id === session.id
-        ? { ...s, messages: [...s.messages, tempMsg] }
-        : s
-    )
-  );
+  setInputValue(""); // 👈 clear input thôi
 
   try {
     await userChatApi.sendMessage(payload);
+    // ❌ KHÔNG setSessions ở đây
+    // ✅ Polling sẽ load message thật
   } catch (err) {
     console.error("❌ Staff send failed", err);
     setLastError("Send message failed");
   }
 };
+
 
 
 
