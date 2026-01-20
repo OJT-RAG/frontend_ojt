@@ -12,7 +12,11 @@ const ojtDocumentApi = {
 
   // Tags
   getTags: (id) => httpClient.get(`/OjtDocument/${id}/tags`),
-  addTag: (id, tagId) => httpClient.post(`/OjtDocument/${id}/tags`, tagId),
+  // Backend expects a JSON number in the request body (e.g. 5) with Content-Type: application/json
+  addTag: (id, tagId) =>
+    httpClient.post(`/OjtDocument/${id}/tags`, JSON.stringify(tagId), {
+      headers: { "Content-Type": "application/json" },
+    }),
   removeTag: (id, tagId) => httpClient.delete(`/OjtDocument/${id}/tags/${tagId}`),
 
   // Optional: some backends return the file as a blob
