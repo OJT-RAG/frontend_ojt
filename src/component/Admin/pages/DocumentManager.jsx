@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import "./DocumentManager.scss";
 import ojtDocumentApi from "../../API/OjtDocumentAPI";
 import semesterApi from "../../API/SemesterAPI";
@@ -44,6 +44,11 @@ const DocumentManager = () => {
   const [appConfig, setAppConfig] = useState(null);
   const [syncingNow, setSyncingNow] = useState(false);
   const [syncNotice, setSyncNotice] = useState("");
+  const [syncStatus, setSyncStatus] = useState(null);
+  const [syncStatusError, setSyncStatusError] = useState("");
+  const [syncLastUpdatedAt, setSyncLastUpdatedAt] = useState(null);
+  const [syncPolling, setSyncPolling] = useState(false);
+  const [syncHasStarted, setSyncHasStarted] = useState(false);
 
   const [tagsByDocId, setTagsByDocId] = useState({});
   const [tagsLoadingByDocId, setTagsLoadingByDocId] = useState({});
@@ -71,6 +76,106 @@ const DocumentManager = () => {
     const runtime = appConfig?.ragApiBaseUrl;
     return sanitizeBaseUrl(env || runtime || DEFAULT_RAG_BASE);
   }, [appConfig]);
+
+  const normalizeSyncStatus = (raw) => {
+    const obj = raw && typeof raw === "object" ? raw : {};
+    return {
+      is_running: !!(obj.is_running ?? obj.isRunning ?? obj.running),
+      current_step: obj.current_step ?? obj.currentStep ?? "",
+      progress: obj.progress ?? "",
+      percentage: obj.percentage ?? obj.percent ?? "",
+      last_finished: obj.last_finished ?? obj.lastFinished ?? null,
+    };
+  };
+
+  const fetchSyncStatus = useCallback(async () => {
+    if (!ragBaseUrl) throw new Error("Missing RAG base URL");
+
+    const response = await fetch(`${ragBaseUrl}/SyncStatus`, {
+      method: "GET",
+      headers: { Accept: "application/json" },
+    });
+
+    const contentType = response.headers.get("content-type") || "";
+    const payload = contentType.includes("application/json")
+      ? await response.json()
+      : await response.text();
+
+    if (!response.ok) {
+      const message =
+        typeof payload === "string"
+          ? payload
+          : payload?.message || payload?.error || `HTTP ${response.status}`;
+      throw new Error(message);
+    }
+
+    const status = normalizeSyncStatus(payload);
+    setSyncStatus(status);
+    setSyncLastUpdatedAt(Date.now());
+    setSyncStatusError("");
+    return status;
+  }, [ragBaseUrl]);
+
+  // Load current status once (useful if a sync was started elsewhere)
+  useEffect(() => {
+    let cancelled = false;
+    if (!ragBaseUrl) return undefined;
+    (async () => {
+      try {
+        const status = await fetchSyncStatus();
+        if (cancelled) return;
+        if (status?.is_running) {
+          setSyncingNow(true);
+          setSyncPolling(true);
+          setSyncHasStarted(true);
+          setSyncNotice((n) => n || "Syncing latest data… This may take a few minutes.");
+        }
+      } catch {
+        // ignore
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [ragBaseUrl, fetchSyncStatus]);
+
+  // Poll /SyncStatus every 5 seconds while polling is enabled
+  useEffect(() => {
+    if (!syncPolling) return undefined;
+    if (!ragBaseUrl) return undefined;
+
+    let cancelled = false;
+    let intervalId = null;
+
+    const tick = async () => {
+      try {
+        const status = await fetchSyncStatus();
+        if (cancelled) return;
+
+        if (status?.is_running) {
+          setSyncHasStarted(true);
+        }
+
+        // Only auto-stop after we have observed the sync running at least once.
+        if (status && status.is_running === false && syncHasStarted) {
+          setSyncPolling(false);
+          setSyncingNow(false);
+          setSyncNotice((n) => (n && n.startsWith("Sync failed") ? n : "Sync finished."));
+        }
+      } catch (e) {
+        if (cancelled) return;
+        setSyncStatusError(e?.message || "Failed to fetch sync status");
+      }
+    };
+
+    tick();
+    intervalId = window.setInterval(tick, 5000);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) window.clearInterval(intervalId);
+    };
+  }, [syncPolling, ragBaseUrl, fetchSyncStatus, syncHasStarted]);
 
   useEffect(() => {
     let cancelled = false;
@@ -299,6 +404,9 @@ const DocumentManager = () => {
     }
 
     setSyncingNow(true);
+    setSyncPolling(false);
+    setSyncHasStarted(false);
+    setSyncStatusError("");
     setSyncNotice("Syncing latest data… This may take a few minutes.");
 
     try {
@@ -325,9 +433,18 @@ const DocumentManager = () => {
           ? payload
           : payload?.message || payload?.status || "Sync started. Please wait a few minutes.";
       setSyncNotice(String(message));
+
+      // Start polling and fetch first status immediately.
+      setSyncPolling(true);
+      try {
+        const status = await fetchSyncStatus();
+        if (status?.is_running) setSyncHasStarted(true);
+      } catch {
+        // ignore (polling will keep trying)
+      }
     } catch (e) {
       setSyncNotice(`Sync failed: ${e?.message || "Unknown error"}`);
-    } finally {
+      setSyncPolling(false);
       setSyncingNow(false);
     }
   };
@@ -512,6 +629,44 @@ const DocumentManager = () => {
 
         {(syncingNow || syncNotice) && (
           <div className={`dm-sync-notice ${syncingNow ? "is-syncing" : ""}`}>{syncNotice}</div>
+        )}
+
+        {(syncingNow || syncPolling) && (
+          <div className={`dm-sync-board ${syncingNow ? "is-syncing" : ""}`}>
+            <div className="dm-sync-board-header">
+              <div className="dm-sync-board-title">Sync progress</div>
+              <div className={`dm-sync-state ${syncStatus?.is_running ? "is-running" : ""}`}>
+                {syncStatus?.is_running ? "RUNNING" : "IDLE"}
+              </div>
+            </div>
+
+            {syncStatusError && <div className="dm-sync-error">{syncStatusError}</div>}
+
+            <table className="dm-sync-kv">
+              <tbody>
+                <tr>
+                  <th>Current step</th>
+                  <td>{syncStatus?.current_step || "-"}</td>
+                </tr>
+                <tr>
+                  <th>Progress</th>
+                  <td>{syncStatus?.progress || "-"}</td>
+                </tr>
+                <tr>
+                  <th>Percentage</th>
+                  <td>{syncStatus?.percentage || "-"}</td>
+                </tr>
+                <tr>
+                  <th>Last finished</th>
+                  <td>{syncStatus?.last_finished == null ? "-" : String(syncStatus.last_finished)}</td>
+                </tr>
+                <tr>
+                  <th>Updated</th>
+                  <td>{syncLastUpdatedAt ? new Date(syncLastUpdatedAt).toLocaleString() : "-"}</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
         )}
 
         <table className="admin-table dm-table">
