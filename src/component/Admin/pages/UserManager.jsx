@@ -2,12 +2,28 @@ import React, { useEffect, useMemo, useState } from 'react';
 import './UserManager.scss';
 import userApi from '../../API/UserAPI';
 import majorApi from '../../API/MajorAPI';
+import { useAuth } from '../../Hook/useAuth';
 
 const UserManager = () => {
+  const { authUser } = useAuth();
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [users, setUsers] = useState([]);
   const [majors, setMajors] = useState([]);
+
+  const currentUserId = useMemo(() => {
+    const fromContext = Number(authUser?.id ?? authUser?.userId ?? 0) || 0;
+    if (fromContext) return fromContext;
+
+    try {
+      const raw = localStorage.getItem('authUser');
+      const parsed = raw ? JSON.parse(raw) : {};
+      return Number(parsed?.id ?? parsed?.userId ?? 0) || 0;
+    } catch {
+      return 0;
+    }
+  }, [authUser]);
 
   const [editingUser, setEditingUser] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
@@ -147,11 +163,17 @@ const UserManager = () => {
   };
 
   const handleDelete = async (userId) => {
+    const targetId = Number(userId) || 0;
+    if (currentUserId && targetId && currentUserId === targetId) {
+      window.alert("You can't delete the account you're currently using.");
+      return;
+    }
+
     const ok = window.confirm('Delete this user?');
     if (!ok) return;
     try {
-      await userApi.deleteById(userId);
-      setUsers((prev) => prev.filter((u) => u?.userId !== userId));
+      await userApi.deleteById(targetId);
+      setUsers((prev) => prev.filter((u) => Number(u?.userId) !== targetId));
     } catch (e) {
       window.alert(e?.response?.data?.message || e?.message || 'Delete failed');
     }
@@ -386,6 +408,7 @@ const UserManager = () => {
               filteredUsers.map((u) => {
                 const majorName = u?.majorId != null ? (majorMap.get(Number(u.majorId)) || String(u.majorId)) : '-';
                 const roleName = getRoleLabel(u);
+                const isSelf = currentUserId && Number(u?.userId) === Number(currentUserId);
                 return (
                   <tr key={u.userId}>
                     <td>{u.studentCode || '-'}</td>
@@ -422,6 +445,8 @@ const UserManager = () => {
                           className="btn-danger"
                           type="button"
                           onClick={() => handleDelete(u.userId)}
+                          disabled={isSelf}
+                          title={isSelf ? "You can't delete your own account." : 'Delete user'}
                         >
                           Delete
                         </button>
