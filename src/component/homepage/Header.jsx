@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useI18n } from "../../i18n/i18n.jsx";
 import { useAuth } from "../Hook/useAuth.jsx";
 import {
-  Languages, User, MessageSquare, BookOpen, Home, Shield
+  Languages, User, MessageSquare, BookOpen, Home, Shield, LogOut
 } from "lucide-react";
 import semesterApi from "../API/SemesterAPI.js";
 import "./Header.css";
@@ -105,18 +105,10 @@ const Header = () => {
 
           {role !== "guest" ? (
             <button className="btn btn-card" onClick={handleLogout}>
-              <User /> <span>{t("logout")}</span>
+              <LogOut /> <span>{t("logout")}</span>
             </button>
           ) : (
             <Link to="/login"><button className="btn btn-card"><User /> <span>{t("login")}</span></button></Link>
-          )}
-
-          {role !== "guest" && (
-            <Link to="/profile/cv" className="avatar-link">
-              <div className="avatar">
-                <User />
-              </div>
-            </Link>
           )}
         </div>
       </div>

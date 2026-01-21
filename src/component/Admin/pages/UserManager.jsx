@@ -3,6 +3,7 @@ import './UserManager.scss';
 import userApi from '../../API/UserAPI';
 import majorApi from '../../API/MajorAPI';
 import { useAuth } from '../../Hook/useAuth';
+import { pickAvatarUrl } from '../../lib/utils.jsx';
 
 const UserManager = () => {
   const { authUser } = useAuth();
@@ -27,6 +28,9 @@ const UserManager = () => {
 
   const [editingUser, setEditingUser] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
+  const [avatarInputKey, setAvatarInputKey] = useState(0);
+  const [editAvatarPreviewUrl, setEditAvatarPreviewUrl] = useState('');
+  const [editAvatarPreviewIsObjectUrl, setEditAvatarPreviewIsObjectUrl] = useState(false);
   const [editForm, setEditForm] = useState({
     fullname: '',
     studentCode: '',
@@ -181,6 +185,7 @@ const UserManager = () => {
 
   const openEdit = (u) => {
     setEditingUser(u);
+    setAvatarInputKey((k) => k + 1);
     const initial = {
       fullname: u?.fullname ?? '',
       studentCode: u?.studentCode ?? '',
@@ -196,12 +201,21 @@ const UserManager = () => {
       avatarFile: null,
       cvFile: null,
     });
+
+    setEditAvatarPreviewUrl(pickAvatarUrl(u) || '');
+    setEditAvatarPreviewIsObjectUrl(false);
   };
 
   const closeEdit = () => {
     if (editSaving) return;
     setEditingUser(null);
     setEditInitial(null);
+    if (editAvatarPreviewIsObjectUrl && editAvatarPreviewUrl) {
+      try { URL.revokeObjectURL(editAvatarPreviewUrl); } catch {}
+    }
+    setEditAvatarPreviewUrl('');
+    setEditAvatarPreviewIsObjectUrl(false);
+    setAvatarInputKey((k) => k + 1);
     setEditForm({
       fullname: '',
       studentCode: '',
@@ -350,6 +364,69 @@ const UserManager = () => {
     return 'staff';
   };
 
+  const isAllowedAvatarFile = (file) => {
+    if (!(file instanceof File)) return false;
+    const allowedTypes = new Set(['image/png', 'image/jpeg']);
+    if (allowedTypes.has(file.type)) return true;
+    // Fallback when some browsers don't provide a type.
+    const name = String(file.name || '').toLowerCase();
+    return name.endsWith('.png') || name.endsWith('.jpg') || name.endsWith('.jpeg');
+  };
+
+  const handleAvatarFileChange = (e) => {
+    const file = e.target.files?.[0] || null;
+    if (!file) {
+      setField('avatarFile', null);
+      if (editAvatarPreviewIsObjectUrl && editAvatarPreviewUrl) {
+        try { URL.revokeObjectURL(editAvatarPreviewUrl); } catch {}
+      }
+      setEditAvatarPreviewIsObjectUrl(false);
+      setEditAvatarPreviewUrl(pickAvatarUrl(editingUser) || '');
+      return;
+    }
+
+    if (!isAllowedAvatarFile(file)) {
+      window.alert('Avatar must be a PNG or JPG image.');
+      setField('avatarFile', null);
+      setAvatarInputKey((k) => k + 1);
+      return;
+    }
+
+    setField('avatarFile', file);
+    if (editAvatarPreviewIsObjectUrl && editAvatarPreviewUrl) {
+      try { URL.revokeObjectURL(editAvatarPreviewUrl); } catch {}
+    }
+    const url = URL.createObjectURL(file);
+    setEditAvatarPreviewUrl(url);
+    setEditAvatarPreviewIsObjectUrl(true);
+  };
+
+  const UserAvatar = ({ url, label }) => {
+    const [broken, setBroken] = useState(false);
+    const initials = getInitials(label);
+
+    const normalizedUrl = useMemo(() => pickAvatarUrl({ avatarUrl: url }), [url]);
+
+    if (!normalizedUrl || broken) {
+      return (
+        <div className="user-avatar fallback" aria-label="avatar placeholder">
+          {initials}
+        </div>
+      );
+    }
+
+    return (
+      <img
+        className="user-avatar"
+        src={normalizedUrl}
+        alt={label || 'avatar'}
+        referrerPolicy="no-referrer"
+        loading="lazy"
+        onError={() => setBroken(true)}
+      />
+    );
+  };
+
   return (
     <div className="admin-page user-manager">
       <div className="page-header">
@@ -428,13 +505,7 @@ const UserManager = () => {
                       )}
                     </td>
                     <td>
-                      {u.avatarUrl ? (
-                        <img className="user-avatar" src={u.avatarUrl} alt={u.fullname || 'avatar'} />
-                      ) : (
-                        <div className="user-avatar fallback" aria-label="avatar placeholder">
-                          {getInitials(u.fullname || u.email)}
-                        </div>
-                      )}
+                      <UserAvatar url={u.avatarUrl || u.avatarURL} label={u.fullname || u.email} />
                     </td>
                     <td>
                       <div className="actions">
@@ -513,7 +584,26 @@ const UserManager = () => {
 
                   <label>
                     Avatar file
-                    <input type="file" accept="image/*" onChange={(e) => setField('avatarFile', e.target.files?.[0] || null)} />
+                    <input
+                      key={avatarInputKey}
+                      type="file"
+                      accept="image/png,image/jpeg,.png,.jpg,.jpeg"
+                      onChange={handleAvatarFileChange}
+                    />
+                    <div className="avatar-preview" aria-label="Selected avatar preview">
+                      {editAvatarPreviewUrl ? (
+                        <img
+                          src={editAvatarPreviewUrl}
+                          alt={editForm.fullname ? `${editForm.fullname} avatar` : 'avatar preview'}
+                          referrerPolicy="no-referrer"
+                          onError={(e) => {
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="avatar-fallback">{getInitials(editForm.fullname || editingUser?.email)}</div>
+                      )}
+                    </div>
                   </label>
 
                   <label>

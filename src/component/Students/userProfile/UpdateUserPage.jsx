@@ -133,11 +133,19 @@ const UpdateUserPage = ({ userId = 0 }) => {
 
         <Form.Item label="Avatar (optional)">
           <Upload
-            accept="image/*"
+            accept="image/png,image/jpeg,.png,.jpg,.jpeg"
             maxCount={1}
-            beforeUpload={() => false}
+            beforeUpload={(file) => {
+              const allowed = file?.type === 'image/png' || file?.type === 'image/jpeg';
+              if (!allowed) {
+                message.error('Avatar must be a PNG or JPG image.');
+                return Upload.LIST_IGNORE;
+              }
+              return false;
+            }}
             fileList={avatarFileList}
             onChange={({ fileList }) => setAvatarFileList(fileList)}
+            listType="picture"
           >
             <Button>Select avatar file</Button>
           </Upload>

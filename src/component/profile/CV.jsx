@@ -5,6 +5,8 @@ import './CV.scss';
 import fptBadge from '../assets/fpt.png';
 import { useI18n } from '../../i18n/i18n.jsx';
 import userApi from '../API/UserAPI.js';
+import { pickAvatarUrl } from '../lib/utils.jsx';
+import semesterApi from '../API/SemesterAPI.js';
 
 function CV({ student }) {
   const navigate = useNavigate();
@@ -29,6 +31,28 @@ function CV({ student }) {
   }, [location, navigate]);
 
   const [profile, setProfile] = useState(null);
+  const [activeSemesterName, setActiveSemesterName] = useState('');
+
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadActiveSemester = async () => {
+      try {
+        const res = await semesterApi.getAll();
+        const list = Array.isArray(res?.data) ? res.data : res?.data?.data || [];
+        const active = list.find((s) => s?.isActive);
+        const name = active?.name || active?.semesterName || '';
+        if (!cancelled) setActiveSemesterName(name);
+      } catch {
+        if (!cancelled) setActiveSemesterName('');
+      }
+    };
+
+    loadActiveSemester();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -83,10 +107,10 @@ function CV({ student }) {
         major: profile.major || '-',
         studentNumber: profile.studentNumber || '-',
         dob: profile.dob || '-',
-        currentSemester: profile.currentSemester || '-',
+        currentSemester: profile.currentSemester || activeSemesterName || '-',
         joinSemester: profile.joinSemester || '-',
         expectedGraduate: profile.expectedGraduate || '-',
-        avatarUrl: profile.avatarUrl || null,
+        avatarUrl: pickAvatarUrl(profile) || null,
       };
     }
 
@@ -101,12 +125,17 @@ function CV({ student }) {
       major: majorText,
       studentNumber: profile?.studentCode || '-',
       dob: profile?.dob || '-',
-      currentSemester: profile?.currentSemester || '-',
+      currentSemester: profile?.currentSemester || activeSemesterName || '-',
       joinSemester: profile?.joinSemester || '-',
       expectedGraduate: profile?.expectedGraduate || '-',
-      avatarUrl: profile?.avatarUrl || null,
+      avatarUrl: pickAvatarUrl(profile) || null,
     };
-  }, [profile]);
+  }, [profile, activeSemesterName]);
+
+  const [avatarBroken, setAvatarBroken] = useState(false);
+  useEffect(() => {
+    setAvatarBroken(false);
+  }, [data.avatarUrl]);
 
   const getInitials = (fullName) => {
     if (!fullName) return '';
@@ -248,8 +277,13 @@ function CV({ student }) {
 
         <div className="cv-content">
           <div className="cv-avatar">
-            {data.avatarUrl ? (
-              <img src={data.avatarUrl} alt={`${data.name} avatar`} />
+            {data.avatarUrl && !avatarBroken ? (
+              <img
+                src={data.avatarUrl}
+                alt={`${data.name} avatar`}
+                referrerPolicy="no-referrer"
+                onError={() => setAvatarBroken(true)}
+              />
             ) : (
               <div className="avatar-fallback" aria-label="Avatar placeholder">
                 {getInitials(data.name)}
