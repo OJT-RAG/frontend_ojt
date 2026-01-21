@@ -126,6 +126,19 @@
   background: #f7f7f7;
 }
 
+.signup-form input.input-error {
+  border-color: #b94a48;
+  background: #fff5f5;
+}
+
+.signup-form .field-error {
+  margin-top: -0.65rem;
+  margin-bottom: 0.9rem;
+  font-size: 0.85rem;
+  color: #b94a48;
+  font-weight: 600;
+}
+
 .signup-form input:focus {
   border-color: rgb(204, 135, 75);
   box-shadow: 0 2px 8px rgba(204,135,75,0.18);

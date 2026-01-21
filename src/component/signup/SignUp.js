@@ -20,6 +20,16 @@ function SignUp() {
     avatarFile: null,
     cvFile: null,
   });
+  const [touched, setTouched] = useState({
+    fullname: false,
+    studentCode: false,
+    phone: false,
+  });
+  const [errors, setErrors] = useState({
+    fullname: '',
+    studentCode: '',
+    phone: '',
+  });
   const [majors, setMajors] = useState([]);
   const [majorsLoading, setMajorsLoading] = useState(false);
   const [majorsError, setMajorsError] = useState('');
@@ -30,13 +40,52 @@ function SignUp() {
   const navigate = useNavigate();
   const { t } = useI18n();
 
+  function validateField(name, value) {
+    const v = (value ?? '').toString().trim();
+
+    if (name === 'fullname') {
+      if (!v) return t('error_fullname_required');
+      // Only allow letters + spaces. Disallow numbers and special characters.
+      if (!/^[\p{L}\s]+$/u.test(v)) return t('error_fullname_invalid');
+      return '';
+    }
+
+    if (name === 'studentCode') {
+      if (!v) return '';
+      // No special characters. Allow letters and digits only.
+      if (!/^[A-Za-z0-9]+$/.test(v)) return t('error_studentcode_invalid');
+      return '';
+    }
+
+    if (name === 'phone') {
+      if (!v) return '';
+      // No alphabet and no special characters. Digits only.
+      if (!/^\d+$/.test(v)) return t('error_phone_invalid');
+      return '';
+    }
+
+    return '';
+  }
+
   function onChange(e) {
     const { name, value, files } = e.target;
     if (name === 'avatarFile' || name === 'cvFile') {
-      setForm({ ...form, [name]: files?.[0] || null });
+      setForm((prev) => ({ ...prev, [name]: files?.[0] || null }));
       return;
     }
-    setForm({ ...form, [name]: value });
+
+    setForm((prev) => ({ ...prev, [name]: value }));
+    if (name === 'fullname' || name === 'studentCode' || name === 'phone') {
+      setErrors((prev) => ({ ...prev, [name]: validateField(name, value) }));
+    }
+  }
+
+  function onBlur(e) {
+    const { name, value } = e.target;
+    if (name === 'fullname' || name === 'studentCode' || name === 'phone') {
+      setTouched((prev) => ({ ...prev, [name]: true }));
+      setErrors((prev) => ({ ...prev, [name]: validateField(name, value) }));
+    }
   }
 
   const loadMajors = async () => {
@@ -102,6 +151,18 @@ function SignUp() {
 
   async function handleSubmit(e) {
     e.preventDefault();
+
+    const nextErrors = {
+      fullname: validateField('fullname', form.fullname),
+      studentCode: validateField('studentCode', form.studentCode),
+      phone: validateField('phone', form.phone),
+    };
+    setErrors((prev) => ({ ...prev, ...nextErrors }));
+    setTouched((prev) => ({ ...prev, fullname: true, studentCode: true, phone: true }));
+    if (Object.values(nextErrors).some(Boolean)) {
+      return;
+    }
+
     if (form.password !== form.confirm) {
       alert(t('error_password_mismatch'));
       return;
@@ -204,13 +265,48 @@ function SignUp() {
         <div className="signup-logo">FPT</div>
         <h2>{t('signup_title')}</h2>
 
-        <input name="fullname" placeholder={t('full_name')} value={form.fullname} onChange={onChange} required aria-label={t('full_name')} />
+        <input
+          className={touched.fullname && errors.fullname ? 'input-error' : ''}
+          name="fullname"
+          placeholder={t('full_name')}
+          value={form.fullname}
+          onChange={onChange}
+          onBlur={onBlur}
+          required
+          aria-label={t('full_name')}
+        />
+        {touched.fullname && errors.fullname && (
+          <div className="field-error" role="alert">{errors.fullname}</div>
+        )}
         <input name="email" type="email" placeholder={t('email_placeholder')} value={form.email} onChange={onChange} required aria-label="Email" />
         <input name="password" type="password" placeholder={t('password')} value={form.password} onChange={onChange} required aria-label={t('password')} />
         <input name="confirm" type="password" placeholder={t('confirm_password')} value={form.confirm} onChange={onChange} required aria-label={t('confirm_password')} />
 
-        <input name="studentCode" placeholder={t('student_number')} value={form.studentCode} onChange={onChange} aria-label={t('student_number')} />
-        <input name="phone" placeholder={t('phone')} value={form.phone} onChange={onChange} aria-label={t('phone')} />
+        <input
+          className={touched.studentCode && errors.studentCode ? 'input-error' : ''}
+          name="studentCode"
+          placeholder={t('student_number')}
+          value={form.studentCode}
+          onChange={onChange}
+          onBlur={onBlur}
+          aria-label={t('student_number')}
+        />
+        {touched.studentCode && errors.studentCode && (
+          <div className="field-error" role="alert">{errors.studentCode}</div>
+        )}
+
+        <input
+          className={touched.phone && errors.phone ? 'input-error' : ''}
+          name="phone"
+          placeholder={t('phone')}
+          value={form.phone}
+          onChange={onChange}
+          onBlur={onBlur}
+          aria-label={t('phone')}
+        />
+        {touched.phone && errors.phone && (
+          <div className="field-error" role="alert">{errors.phone}</div>
+        )}
         <input name="dob" type="date" placeholder={t('date_of_birth')} value={form.dob} onChange={onChange} aria-label={t('date_of_birth')} />
 
         <select name="majorId" value={form.majorId} onChange={onChange} aria-label={t('major')} required>
@@ -266,7 +362,12 @@ function SignUp() {
       </label>
 
         <div className="row">
-          <button type="submit" disabled={submitting}>{submitting ? t('creating') : t('create_account_btn')}</button>
+          <button
+            type="submit"
+            disabled={submitting || Boolean(errors.fullname) || Boolean(errors.studentCode) || Boolean(errors.phone)}
+          >
+            {submitting ? t('creating') : t('create_account_btn')}
+          </button>
         </div>
         <p className="note">{t('terms_note')}</p>
       </form>

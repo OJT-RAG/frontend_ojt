@@ -151,6 +151,10 @@ export const translations = {
     loading: 'Loading…',
     no_majors_found: 'No majors found',
     error_password_mismatch: 'Passwords do not match',
+    error_fullname_required: 'Full name is required.',
+    error_fullname_invalid: 'Full name cannot contain numbers or special characters.',
+    error_studentcode_invalid: 'Student number cannot contain special characters.',
+    error_phone_invalid: 'Phone can only contain digits.',
     signup_submit_success: 'Account created successfully.',
     signup_submit_error: 'Failed to create account.',
 
@@ -416,6 +420,10 @@ export const translations = {
     loading: 'Đang tải…',
     no_majors_found: 'Không tìm thấy chuyên ngành',
     error_password_mismatch: 'Mật khẩu không khớp',
+    error_fullname_required: 'Họ và tên là bắt buộc.',
+    error_fullname_invalid: 'Họ và tên không được chứa số hoặc ký tự đặc biệt.',
+    error_studentcode_invalid: 'Mã sinh viên không được chứa ký tự đặc biệt.',
+    error_phone_invalid: 'Số điện thoại chỉ được chứa chữ số.',
     signup_submit_success: 'Tạo tài khoản thành công.',
     signup_submit_error: 'Tạo tài khoản thất bại.',
 
@@ -664,6 +672,10 @@ export const translations = {
     loading: '読み込み中…',
     no_majors_found: '専攻が見つかりません',
     error_password_mismatch: 'パスワードが一致しません',
+    error_fullname_required: '氏名は必須です。',
+    error_fullname_invalid: '氏名に数字や記号は使えません。',
+    error_studentcode_invalid: '学生番号に記号は使えません。',
+    error_phone_invalid: '電話番号は数字のみ使用できます。',
     signup_submit_success: 'アカウントが正常に作成されました。',
     signup_submit_error: 'アカウントの作成に失敗しました。',
 
