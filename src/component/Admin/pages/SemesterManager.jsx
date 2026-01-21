@@ -1,8 +1,42 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import './SemesterManager.scss';
 import semesterApi from '../../API/SemesterAPI';
+import { DatePicker, notification } from 'antd';
+import dayjs from 'dayjs';
 
 const SemesterManager = () => {
+  const broadcastSemesterUpdated = () => {
+    try {
+      window.dispatchEvent(new Event('semester:updated'));
+      // Triggers cross-tab updates via the 'storage' event
+      localStorage.setItem('semester_last_updated', String(Date.now()));
+    } catch {
+      // ignore
+    }
+  };
+
+  const notifyError = (description) => {
+    const text = String(description || '').trim();
+    if (!text) return;
+    notification.error({
+      message: 'Semester',
+      description: text,
+      placement: 'topRight',
+      duration: 3,
+    });
+  };
+
+  const notifySuccess = (description) => {
+    const text = String(description || '').trim();
+    if (!text) return;
+    notification.success({
+      message: 'Semester',
+      description: text,
+      placement: 'topRight',
+      duration: 2.5,
+    });
+  };
+
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [semesters, setSemesters] = useState([]);
@@ -119,13 +153,13 @@ const SemesterManager = () => {
   const saveCreate = async () => {
     const msg = validateForm(createForm);
     if (msg) {
-      window.alert(msg);
+      notifyError(msg);
       return;
     }
 
     const activeMsg = validateSingleActive(!!createForm.isActive, 0);
     if (activeMsg) {
-      window.alert(activeMsg);
+      notifyError(activeMsg);
       return;
     }
     try {
@@ -146,21 +180,23 @@ const SemesterManager = () => {
       }
       setCreating(false);
       resetCreate();
+      notifySuccess('Created successfully.');
+      broadcastSemesterUpdated();
     } catch (e) {
-      window.alert(e?.response?.data?.message || e?.message || 'Create failed');
+      notifyError(e?.response?.data?.message || e?.message || 'Create failed');
     }
   };
 
   const saveEdit = async (id) => {
     const msg = validateForm(editForm);
     if (msg) {
-      window.alert(msg);
+      notifyError(msg);
       return;
     }
 
     const activeMsg = validateSingleActive(!!editForm.isActive, id);
     if (activeMsg) {
-      window.alert(activeMsg);
+      notifyError(activeMsg);
       return;
     }
     try {
@@ -179,8 +215,10 @@ const SemesterManager = () => {
         setSemesters(reload?.data?.data || []);
       }
       cancelEdit();
+      notifySuccess('Updated successfully.');
+      broadcastSemesterUpdated();
     } catch (e) {
-      window.alert(e?.response?.data?.message || e?.message || 'Update failed');
+      notifyError(e?.response?.data?.message || e?.message || 'Update failed');
     }
   };
 
@@ -191,8 +229,9 @@ const SemesterManager = () => {
       await semesterApi.delete(id);
       setSemesters((prev) => prev.filter((s) => s?.semesterId !== id));
       if (editingId === id) cancelEdit();
+      broadcastSemesterUpdated();
     } catch (e) {
-      window.alert(e?.response?.data?.message || e?.message || 'Delete failed');
+      notifyError(e?.response?.data?.message || e?.message || 'Delete failed');
     }
   };
 
@@ -231,21 +270,37 @@ const SemesterManager = () => {
                   />
                 </td>
                 <td>
-                  <input
+                  <DatePicker
                     className="sm-input"
-                    type="date"
-                    value={createForm.startDate}
-                    max={createForm.endDate || undefined}
-                    onChange={(e) => setCreateForm((p) => ({ ...p, startDate: e.target.value }))}
+                    style={{ width: '100%' }}
+                    format="YYYY-MM-DD"
+                    inputReadOnly
+                    value={createForm.startDate ? dayjs(createForm.startDate) : null}
+                    disabledDate={(current) => {
+                      if (!createForm.endDate) return false;
+                      const end = dayjs(createForm.endDate);
+                      return !!current && current.isAfter(end, 'day');
+                    }}
+                    onChange={(date) =>
+                      setCreateForm((p) => ({ ...p, startDate: date ? date.format('YYYY-MM-DD') : '' }))
+                    }
                   />
                 </td>
                 <td>
-                  <input
+                  <DatePicker
                     className="sm-input"
-                    type="date"
-                    value={createForm.endDate}
-                    min={createForm.startDate || undefined}
-                    onChange={(e) => setCreateForm((p) => ({ ...p, endDate: e.target.value }))}
+                    style={{ width: '100%' }}
+                    format="YYYY-MM-DD"
+                    inputReadOnly
+                    value={createForm.endDate ? dayjs(createForm.endDate) : null}
+                    disabledDate={(current) => {
+                      if (!createForm.startDate) return false;
+                      const start = dayjs(createForm.startDate);
+                      return !!current && current.isBefore(start, 'day');
+                    }}
+                    onChange={(date) =>
+                      setCreateForm((p) => ({ ...p, endDate: date ? date.format('YYYY-MM-DD') : '' }))
+                    }
                   />
                 </td>
                 <td>
@@ -258,7 +313,7 @@ const SemesterManager = () => {
                         const next = e.target.checked;
                         const activeMsg = validateSingleActive(next, 0);
                         if (activeMsg) {
-                          window.alert(activeMsg);
+                          notifyError(activeMsg);
                           return;
                         }
                         setCreateForm((p) => ({ ...p, isActive: next }));
@@ -308,12 +363,20 @@ const SemesterManager = () => {
                     </td>
                     <td>
                       {isEditing ? (
-                        <input
+                        <DatePicker
                           className="sm-input"
-                          type="date"
-                          value={editForm.startDate}
-                          max={editForm.endDate || undefined}
-                          onChange={(e) => setEditForm((p) => ({ ...p, startDate: e.target.value }))}
+                          style={{ width: '100%' }}
+                          format="YYYY-MM-DD"
+                          inputReadOnly
+                          value={editForm.startDate ? dayjs(editForm.startDate) : null}
+                          disabledDate={(current) => {
+                            if (!editForm.endDate) return false;
+                            const end = dayjs(editForm.endDate);
+                            return !!current && current.isAfter(end, 'day');
+                          }}
+                          onChange={(date) =>
+                            setEditForm((p) => ({ ...p, startDate: date ? date.format('YYYY-MM-DD') : '' }))
+                          }
                         />
                       ) : (
                         s.startDate
@@ -321,12 +384,20 @@ const SemesterManager = () => {
                     </td>
                     <td>
                       {isEditing ? (
-                        <input
+                        <DatePicker
                           className="sm-input"
-                          type="date"
-                          value={editForm.endDate}
-                          min={editForm.startDate || undefined}
-                          onChange={(e) => setEditForm((p) => ({ ...p, endDate: e.target.value }))}
+                          style={{ width: '100%' }}
+                          format="YYYY-MM-DD"
+                          inputReadOnly
+                          value={editForm.endDate ? dayjs(editForm.endDate) : null}
+                          disabledDate={(current) => {
+                            if (!editForm.startDate) return false;
+                            const start = dayjs(editForm.startDate);
+                            return !!current && current.isBefore(start, 'day');
+                          }}
+                          onChange={(date) =>
+                            setEditForm((p) => ({ ...p, endDate: date ? date.format('YYYY-MM-DD') : '' }))
+                          }
                         />
                       ) : (
                         s.endDate
@@ -343,7 +414,7 @@ const SemesterManager = () => {
                               const next = e.target.checked;
                               const activeMsg = validateSingleActive(next, semesterId);
                               if (activeMsg) {
-                                window.alert(activeMsg);
+                                notifyError(activeMsg);
                                 return;
                               }
                               setEditForm((p) => ({ ...p, isActive: next }));

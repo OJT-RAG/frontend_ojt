@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import { useI18n } from "../../i18n/i18n.jsx";
 import { useAuth } from "../Hook/useAuth.jsx";
@@ -26,21 +26,37 @@ const Header = () => {
     navigate("/login", { replace: true });
   };
 
+  const refreshActiveSemester = useCallback(async () => {
+    try {
+      const res = await semesterApi.getAll();
+      const list = Array.isArray(res?.data) ? res.data : res?.data?.data || [];
+      const active = list.find((s) => s?.isActive);
+      setActiveSemester(active || null);
+    } catch {
+      setActiveSemester(null);
+    }
+  }, []);
+
   useEffect(() => {
-    let mounted = true;
-    const loadSemester = async () => {
-      try {
-        const res = await semesterApi.getAll();
-        const list = Array.isArray(res?.data) ? res.data : res?.data?.data || [];
-        const active = list.find((s) => s?.isActive);
-        if (mounted) setActiveSemester(active || null);
-      } catch {
-        if (mounted) setActiveSemester(null);
+    refreshActiveSemester();
+
+    const onSemesterUpdated = () => {
+      refreshActiveSemester();
+    };
+
+    const onStorage = (event) => {
+      if (event?.key === "semester_last_updated") {
+        refreshActiveSemester();
       }
     };
-    loadSemester();
-    return () => (mounted = false);
-  }, []);
+
+    window.addEventListener("semester:updated", onSemesterUpdated);
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener("semester:updated", onSemesterUpdated);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, [refreshActiveSemester]);
 
   return (
     <header className="header-root">
