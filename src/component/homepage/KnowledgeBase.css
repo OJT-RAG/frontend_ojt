@@ -281,3 +281,15 @@
   color: hsl(var(--primary));
   background: rgba(0, 0, 0, 0.04);
 }
+/* Time under title */
+.kb-update-time {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+
+  font-size: 0.75rem;
+  color: #6b7280;
+  line-height: 1;
+}
+

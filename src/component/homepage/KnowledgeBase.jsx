@@ -1,5 +1,4 @@
 // Plain JSX component (no Tailwind; uses local .kb-* CSS rules)
-import React from "react";
 import { Card } from "../ui/card";
 import { Badge } from "../ui/badge";
 import { Button } from "../ui/button";
@@ -17,9 +16,31 @@ import {
 } from "lucide-react";
 import "./KnowledgeBase.css";
 import { useI18n } from "../../i18n/i18n.jsx";
+import documentApi from "../API/OjtDocumentAPI.js"
+import React, { useEffect, useState } from "react";
+const timeAgo = (dateString) => {
+  if (!dateString) return "";
+
+  const now = new Date();
+  const past = new Date(dateString);
+  const diffMs = now - past;
+
+  const seconds = Math.floor(diffMs / 1000);
+  const minutes = Math.floor(seconds / 60);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+  const months = Math.floor(days / 30);
+
+  if (seconds < 60) return "vừa xong";
+  if (minutes < 60) return `${minutes} phút trước`;
+  if (hours < 24) return `${hours} giờ trước`;
+  if (days < 30) return `${days} ngày trước`;
+  return `${months} tháng trước`;
+};
 
 const KnowledgeBase = () => {
   const { t } = useI18n();
+  const [recentUpdates, setRecentUpdates] = useState([]);
 
   const kbTitle = (t("kb_title") || "").trim();
   const kbTitleParts = kbTitle.split(/\s+/).filter(Boolean);
@@ -56,24 +77,38 @@ const KnowledgeBase = () => {
       color: "kb-cat-accent"
     }
   ];
+useEffect(() => {
+  loadRecentUpdates();
+}, []);
 
-  const recentUpdates = [
-    {
-      title: t("kb_ru_1_title"),
-      date: t("kb_ru_1_date"),
-      type: t("kb_ru_1_type")
-    },
-    {
-      title: t("kb_ru_2_title"),
-      date: t("kb_ru_2_date"),
-      type: t("kb_ru_2_type")
-    },
-    {
-      title: t("kb_ru_3_title"),
-      date: t("kb_ru_3_date"),
-      type: t("kb_ru_3_type")
-    }
-  ];
+const loadRecentUpdates = async () => {
+  try {
+    const res = await documentApi.getAll();
+
+    const data = Array.isArray(res.data)
+      ? res.data
+      : res.data?.data || [];
+
+    const latestThree = data
+      .filter(d => d.title && d.fileUrl && d.uploadedAt)
+      .sort(
+        (a, b) =>
+          new Date(b.uploadedAt) - new Date(a.uploadedAt)
+      )
+      .slice(0, 3)
+      .map(d => ({
+  title: d.title,
+  fileUrl: d.fileUrl,
+  uploadedAt: d.uploadedAt
+}));
+
+
+    setRecentUpdates(latestThree);
+  } catch (err) {
+    console.error("Load recent updates failed", err);
+  }
+};
+
 
   return (
     <section className="kb-root">
@@ -137,43 +172,56 @@ const KnowledgeBase = () => {
             </div>
 
             <div className="kb-panel-body">
-              {recentUpdates.map((item, idx) => (
-                <div key={idx} className="kb-update kb-update-download">
-                  <div className="kb-update-left">
-                    <div className="kb-update-icon">
-                      <FileText className="kb-icon-small" />
-                    </div>
+  {recentUpdates.map((item, idx) => (
+    <div key={idx} className="kb-update kb-update-download">
+      <div className="kb-update-left">
+        <div className="kb-update-icon">
+          <FileText className="kb-icon-small" />
+        </div>
 
-                    <div className="kb-update-content">
-                      <h4 className="kb-update-title">{item.title}</h4>
-                      <div className="kb-update-meta">
-                        <Badge
-                          variant="outline"
-                          className="kb-meta-badge"
-                        >
-                          {item.type}
-                        </Badge>
-                        <span className="kb-dot">•</span>
-                        <div className="kb-meta-time">
-                          <Clock className="kb-meta-icon" />
-                          {item.date}
-                        </div>
-                      </div>
-                    </div>
-                  </div>
+        <div className="kb-update-content">
+  <a
+    href={item.fileUrl}
+    target="_blank"
+    rel="noopener noreferrer"
+    className="kb-update-title kb-update-link"
+  >
+    {item.title}
+  </a>
 
-                  {/* Download */}
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="kb-download-btn"
-                    title={t("kb_download")}
-                  >
-                    <Download className="kb-icon-sm" />
-                  </Button>
-                </div>
-              ))}
-            </div>
+  <div className="kb-update-time">
+    <Clock className="kb-meta-icon" />
+    {timeAgo(item.uploadedAt)}
+  </div>
+</div>
+
+      </div>
+
+      <Button
+        variant="ghost"
+        size="sm"
+        className="kb-download-btn"
+        title={t("kb_download")}
+        asChild
+      >
+        <a
+          href={item.fileUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          <Download className="kb-icon-sm" />
+        </a>
+      </Button>
+    </div>
+  ))}
+
+  {recentUpdates.length === 0 && (
+    <div className="kb-empty">
+      {t("kb_no_updates")}
+    </div>
+  )}
+</div>
+
           </Card>
         </div>
       </div>
