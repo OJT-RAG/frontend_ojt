@@ -48,7 +48,13 @@ function CV({ student }) {
 
       const userId = Number(authUser?.id) || 0;
       if (!userId) {
-        setProfile(null);
+        // Fallback: if we at least have a user object (e.g., from Google login)
+        // show it instead of empty placeholders.
+        if (authUser && (authUser.fullname || authUser.email || authUser.avatarUrl)) {
+          setProfile(authUser);
+        } else {
+          setProfile(null);
+        }
         return;
       }
 

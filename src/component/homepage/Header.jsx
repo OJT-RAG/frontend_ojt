@@ -113,7 +113,9 @@ const Header = () => {
 
           {role !== "guest" && (
             <Link to="/profile/cv" className="avatar-link">
-              <div className="avatar"><User /></div>
+              <div className="avatar">
+                <User />
+              </div>
             </Link>
           )}
         </div>

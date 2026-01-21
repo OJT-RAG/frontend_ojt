@@ -88,15 +88,31 @@ function Login() {
   };
 
   const normalizeGoogleLoginResponse = (res) => {
-    const payload = res?.data?.data ?? res?.data;
+    const root = res?.data;
+    const payload = root?.data ?? root;
+
     const token =
       payload?.token ||
       payload?.accessToken ||
       payload?.jwt ||
-      payload?.data?.token ||
-      payload?.data?.accessToken;
+      root?.token ||
+      root?.accessToken ||
+      root?.jwt;
 
-    const user = payload?.user || payload?.profile || payload?.data?.user;
+    // Backends commonly return either:
+    // - { success: true, data: { userId, fullname, avatarUrl, ... } }
+    // - { success: true, data: { token, user: {...} } }
+    // - { token, user: {...} }
+    const candidate =
+      payload?.user ||
+      payload?.profile ||
+      payload?.data?.user ||
+      payload?.data ||
+      payload;
+    const user =
+      candidate && typeof candidate === "object" && !Array.isArray(candidate)
+        ? candidate
+        : null;
 
     return { token, user, payload };
   };
@@ -117,14 +133,22 @@ function Login() {
       const jwtPayload = decodeJwtPayload(credential);
 
       const role = String(user?.role || jwtPayload?.role || "student").toLowerCase();
+      const resolvedId =
+        user?.userId ||
+        user?.id ||
+        user?.UserId ||
+        user?.ID ||
+        null;
 
       const authUser = {
-  id: user?.userId || user?.id,
-  fullname: user?.fullname || jwtPayload?.name || "Google User",
-  email: user?.email || jwtPayload?.email,
-  role,
-  company_id: user?.company_ID || user?.companyId || null,
-};
+        id: resolvedId,
+        userId: resolvedId,
+        fullname: user?.fullname || user?.fullName || jwtPayload?.name || "Google User",
+        email: user?.email || jwtPayload?.email,
+        avatarUrl: user?.avatarUrl || user?.avatar_url || jwtPayload?.picture || null,
+        role,
+        company_id: user?.company_ID || user?.companyId || null,
+      };
 
 // LƯU company_id
 if (authUser.company_id) {
