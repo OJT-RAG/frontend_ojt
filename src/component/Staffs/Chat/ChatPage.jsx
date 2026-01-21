@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import ChatContent from "./ChatContent";
 import ChatSessionList from "./ChatSessionList";
-import "./chat.css";
+import "./ChatPage.css";
 
 /** 🔍 Lấy staff từ localStorage */
 const findStaff = () => {
