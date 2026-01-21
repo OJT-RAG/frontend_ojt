@@ -22,6 +22,8 @@ const DocumentManager = () => {
 
   const [filter, setFilter] = useState("all"); // all | general | semester
   const [search, setSearch] = useState("");
+  const PAGE_SIZE = 4;
+  const [page, setPage] = useState(1);
 
   const [uploadOpen, setUploadOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -590,6 +592,18 @@ const DocumentManager = () => {
         return title.includes(q);
       });
   }, [documents, filter, search]);
+  useEffect(() => {
+  setPage(1);
+}, [filter, search]);
+const totalPages = Math.max(
+  1,
+  Math.ceil(filteredDocuments.length / PAGE_SIZE)
+);
+
+const pagedDocuments = useMemo(() => {
+  const start = (page - 1) * PAGE_SIZE;
+  return filteredDocuments.slice(start, start + PAGE_SIZE);
+}, [filteredDocuments, page]);
 
   return (
     <div className="admin-page document-manager">
@@ -666,9 +680,10 @@ const DocumentManager = () => {
                 </tr>
               </tbody>
             </table>
+            
           </div>
         )}
-
+      <div className="dm-table-wrapper">
         <table className="admin-table dm-table">
           <thead>
             <tr>
@@ -695,7 +710,7 @@ const DocumentManager = () => {
                 <td colSpan={7}>No documents found.</td>
               </tr>
             ) : (
-              filteredDocuments.map((doc, idx) => {
+              pagedDocuments.map((doc, idx) => {
                 const id = getDocId(doc);
                 const semesterId = doc?.semesterId;
                 const semesterName = semesterNameById.get(Number(semesterId)) || semesterId || "-";
@@ -803,6 +818,29 @@ const DocumentManager = () => {
             )}
           </tbody>
         </table>
+        </div>
+        {totalPages > 1 && (
+  <div className="dm-pagination">
+    <button
+      disabled={page === 1}
+      onClick={() => setPage((p) => Math.max(1, p - 1))}
+    >
+      ← Prev
+    </button>
+
+    <span>
+      Page {page} / {totalPages}
+    </span>
+
+    <button
+      disabled={page === totalPages}
+      onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+    >
+      Next →
+    </button>
+  </div>
+)}
+
       </div>
 
       {uploadOpen && (

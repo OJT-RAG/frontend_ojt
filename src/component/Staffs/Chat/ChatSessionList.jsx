@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import userApi from "../../API/UserAPI";
 import userChatApi from "../../API/UserChatAPI";
-
+import "./ChatSessionList.scss"
 export default function ChatSessionList({ staffId, onSelect }) {
   const [sessions, setSessions] = useState([]);
   const [loading, setLoading] = useState(true);

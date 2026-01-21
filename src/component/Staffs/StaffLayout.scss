@@ -1,0 +1,30 @@
+.staffs-layout {
+  height: 100vh;
+  overflow: hidden;
+
+  .ant-layout {
+    height: 100%;
+  }
+
+  .staffs-sider {
+    height: 100vh;
+    overflow: hidden;
+  }
+
+  .staffs-content {
+    height: 100vh;
+    overflow: hidden;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    background: #f8fafc;
+  }
+
+  .staffs-content-inner {
+    flex: 1;
+    overflow-y: auto;
+    background: #ffffff;
+    border-radius: 8px;
+    padding: 16px;
+  }
+}

@@ -1,7 +1,15 @@
 .admin-page.document-manager {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden; // 🔒 CHỐT
+
   .card {
-    padding-bottom: 1.75rem;
-  }
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
 
   .toolbar {
     margin-bottom: 1rem;
@@ -50,16 +58,33 @@
     min-width: 90px;
     justify-content: center;
   }
-
+.dm-table-wrapper {
+  flex: 1;                // 🔥 chiếm chiều cao còn lại
+  overflow-y: auto;       // ✅ CHỈ SCROLL Ở ĐÂY
+  margin-top: 0.75rem;
+  min-height: 400px;
+}
   .dm-table {
-    margin-top: 1.25rem;
+  th:nth-child(2),
+  td:nth-child(2) {
+    width: 300px;       // bạn có thể chỉnh 280–360 tuỳ UI
+    max-width: 300px;
   }
+}
 
-  .dm-title a {
-    color: #2563eb;
-    font-weight: 600;
-    text-decoration: none;
-  }
+.dm-title {
+  white-space: normal;         // ✅ cho xuống dòng
+  word-break: break-word;      // ✅ cắt chữ dài
+  overflow-wrap: anywhere;     // ✅ an toàn cho URL
+  line-height: 1.45;
+}
+
+.dm-title a {
+  display: -webkit-box;
+  -webkit-line-clamp: 3;       // 👈 tối đa 3 dòng
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
 
   .dm-title a:hover {
     text-decoration: underline;
@@ -175,12 +200,13 @@
   }
 
   .dm-tags {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    flex-wrap: wrap;
-    min-width: 220px;
-  }
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  max-width: 100%;
+  overflow: hidden;
+}
 
   .dm-tag-list {
     display: inline-flex;
@@ -200,14 +226,16 @@
     color: #0f172a;
     font-size: 0.85rem;
     font-weight: 600;
-    max-width: 260px;
+    max-width: 100%;
+    overflow: hidden;
   }
 
   .dm-tag-name {
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
   .dm-tag-remove {
     width: 22px;
@@ -301,4 +329,14 @@
     gap: 10px;
     margin-top: 4px;
   }
+  .dm-pagination {
+  flex-shrink: 0;
+  min-height: 44px; // 🔒 giữ chỗ cố định
+  padding-top: 12px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: #fff;
+}
+
 }

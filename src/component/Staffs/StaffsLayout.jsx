@@ -6,6 +6,7 @@ import CompanyManagement from "./Company/CompanyManagement.jsx";
 import StaffFinalResultPage from "./Final/StaffFinalResultPage.jsx";
 import ChatPage from "./Chat/ChatPage.jsx";
 import DocumentManager from "../Staffs/DocumentManage/DocumentManager.jsx";
+import "./StaffLayout.scss";
 const { Sider, Content } = Layout;
 
 const StaffsLayout = () => {
