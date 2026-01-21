@@ -65,7 +65,7 @@ export const translations = {
     chat_service_checking: 'Checking assistant status…',
     chat_model_rag: 'Model: RAG Mode',
     chat_model_cv: 'Model: CV Analysis Mode',
-    chat_attach_cv: 'Import File',
+    chat_attach_cv: 'Import File (PDF)',
 
     // RAG docs admin
     rag_admin_title: 'Manage RAG Documents',
@@ -338,7 +338,7 @@ export const translations = {
     chat_service_checking: 'Đang kiểm tra trạng thái trợ lý…',
     chat_model_rag: 'Model: RAG Mode',
     chat_model_cv: 'Model: CV Analysis Mode',
-    chat_attach_cv: 'Nhập file',
+    chat_attach_cv: ' (PDF)',
 
     // RAG docs admin
     rag_admin_title: 'Quản lý tài liệu RAG',

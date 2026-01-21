@@ -21,6 +21,11 @@ import { useI18n } from "../../i18n/i18n.jsx";
 const KnowledgeBase = () => {
   const { t } = useI18n();
 
+  const kbTitle = (t("kb_title") || "").trim();
+  const kbTitleParts = kbTitle.split(/\s+/).filter(Boolean);
+  const kbTitleFirst = kbTitleParts[0] || "";
+  const kbTitleRest = kbTitleParts.length > 1 ? kbTitleParts.slice(1).join(" ") : "";
+
   const categories = [
     {
       icon: FileText,
@@ -81,10 +86,8 @@ const KnowledgeBase = () => {
           </Badge>
 
           <h2 className="kb-title">
-            {t("kb_title").split(" ").slice(0, 1).join(" ") || "Comprehensive"}{" "}
-            <span className="kb-title-gradient">
-              {t("kb_title").replace("Comprehensive ", "")}
-            </span>
+            {kbTitleRest ? `${kbTitleFirst} ` : ""}
+            <span className="kb-title-gradient">{kbTitleRest || kbTitle || "Comprehensive Knowledge Base"}</span>
           </h2>
 
           <p className="kb-sub">{t("kb_sub")}</p>
