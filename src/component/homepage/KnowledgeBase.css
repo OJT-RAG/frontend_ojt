@@ -218,20 +218,34 @@
 
 /* Updates */
 .kb-update {
-  padding: 0.5rem;
-  border-radius: 8px;
-  transition: background 0.12s ease;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+
+  padding: 0.75rem;
+  border-radius: 10px;
+
+  background: #fff;
+  border: 1px solid hsl(var(--border));
+
+  transition: 
+    background 0.12s ease,
+    border-color 0.12s ease,
+    box-shadow 0.12s ease;
 }
+
+
 
 .kb-update:hover {
   background: rgba(0, 0, 0, 0.035);
 }
 
-.kb-update-download {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
+.kb-update:hover {
+  background: rgba(0, 0, 0, 0.02);
+  border-color: hsl(var(--primary));
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.06);
 }
+
 
 .kb-update-left {
   display: flex;
@@ -250,7 +264,7 @@
 
 .kb-update-title {
   font-size: 0.95rem;
-  font-weight: 500;
+  font-weight: 700; /* ⬅ IN ĐẬM */
   margin-bottom: 0.25rem;
 }
 

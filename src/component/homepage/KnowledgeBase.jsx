@@ -18,6 +18,8 @@ import "./KnowledgeBase.css";
 import { useI18n } from "../../i18n/i18n.jsx";
 import documentApi from "../API/OjtDocumentAPI.js"
 import React, { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
+
 const timeAgo = (dateString) => {
   if (!dateString) return "";
 
@@ -46,6 +48,7 @@ const KnowledgeBase = () => {
   const kbTitleParts = kbTitle.split(/\s+/).filter(Boolean);
   const kbTitleFirst = kbTitleParts[0] || "";
   const kbTitleRest = kbTitleParts.length > 1 ? kbTitleParts.slice(1).join(" ") : "";
+  const navigate = useNavigate();
 
   const categories = [
     {
@@ -165,10 +168,16 @@ const loadRecentUpdates = async () => {
               <h3 className="kb-panel-title">
                 {t("kb_recent_updates")}
               </h3>
-              <Button variant="ghost" size="sm" className="kb-viewall">
-                {t("kb_view_all")}
-                <ArrowRight className="kb-arrow-sm" />
-              </Button>
+              <Button
+  variant="ghost"
+  size="sm"
+  className="kb-viewall"
+  onClick={() => navigate("/ojt")}
+>
+  {t("kb_view_all")}
+  <ArrowRight className="kb-arrow-sm" />
+</Button>
+
             </div>
 
             <div className="kb-panel-body">

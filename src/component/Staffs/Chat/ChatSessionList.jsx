@@ -74,8 +74,21 @@ export default function ChatSessionList({ staffId, onSelect }) {
   }, [staffId]);
 
   if (loading) {
-    return <div className="session-list">Loading...</div>;
-  }
+  return (
+    <div className="session-list">
+      <div className="session-header">Chat sessions</div>
+
+      <div className="session-skeleton">
+        {Array.from({ length: 6 }).map((_, i) => (
+          <div key={i} className="skeleton-item">
+            <div className="skeleton-name shimmer" />
+            <div className="skeleton-last shimmer" />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
 
   return (
     <div className="session-list">
