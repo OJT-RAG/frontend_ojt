@@ -8,15 +8,55 @@ const HeroSection = () => {
   const { t } = useI18n();
   const navigate = useNavigate();
 
+  // 1️⃣ IMAGE PATHS
   const heroBanner = "/Hero-banner-webFPTU-2026-2DaoTao100.jpg";
+  const heroBanner2 = "/Bannerweb-Hocphi-Artboard-2-copy-5100-1024x474.png";
+  const heroBanner3 ="/2023_12_9_638376784136834685_hoc-phi-he-dai-hoc-fpt-cover.webp"
   const fptLogo1 = "/fpt.png";
   const fptLogo2 = "/fpt2.png";
-
+  
+  // 2️⃣ SLIDER IMAGES (PHẢI Ở TRƯỚC)
   const sliderImages = [
     { src: heroBanner, alt: "FPTU banner", kind: "banner" },
+    { src: heroBanner2, alt: "FPTU banner 2", kind: "banner" },
+    { src: heroBanner3, alt: "FPTU banner 3", kind: "banner" },
     { src: fptLogo1, alt: "FPT", kind: "logo" },
     { src: fptLogo2, alt: "FPT", kind: "logo" },
   ];
+
+  // 3️⃣ FILTER BANNERS
+
+
+  const banners = sliderImages.filter(i => i.kind === "banner");
+    const bannerSlides = [...banners, banners[0]];
+  const [enableTransition, setEnableTransition] = React.useState(true);
+  
+  // 4️⃣ CAROUSEL STATE
+  const [index, setIndex] = React.useState(0);
+
+ React.useEffect(() => {
+  if (!banners.length) return;
+
+  const timer = setInterval(() => {
+    setIndex(prev => prev + 1);
+  }, 4000);
+
+  return () => clearInterval(timer);
+}, [banners.length]);
+
+React.useEffect(() => {
+  if (index === banners.length) {
+    const timeout = setTimeout(() => {
+      setEnableTransition(false);
+      setIndex(0);
+    }, 500); // phải khớp với CSS transition
+
+    return () => clearTimeout(timeout);
+  } else {
+    setEnableTransition(true);
+  }
+}, [index, banners.length]);
+
 
   return (
     <section className="hero-root">
@@ -99,22 +139,21 @@ const HeroSection = () => {
               <div className="hero-media-glow" aria-hidden="true" />
 
               <div className="hero-slider" aria-hidden="true">
-                <div className="hero-slider-track">
-                  {[...sliderImages, ...sliderImages].map((img, idx) => (
-                    <div
-                      key={`${img.src}-${idx}`}
-                      className={`hero-slide ${img.kind === "logo" ? "logo" : "banner"}`}
-					  style={
-						img.kind === "banner"
-							? { "--banner-bg": `url(${img.src})` }
-							: undefined
-					  }
-                    >
-                      <img src={img.src} alt={img.alt} loading="eager" />
-                    </div>
-                  ))}
-                </div>
-              </div>
+  <div
+    className="hero-carousel-track"
+    style={{
+      transform: `translateX(-${index * 100}%)`,
+      transition: enableTransition ? "transform 0.5s ease-in-out" : "none",
+    }}
+  >
+    {bannerSlides.map((img, idx) => (
+      <div className="hero-carousel-slide" key={idx}>
+        <img src={img.src} alt={img.alt} />
+      </div>
+    ))}
+  </div>
+</div>
+
 
               <div className="floating-primary">
                 <MessageSquare />
