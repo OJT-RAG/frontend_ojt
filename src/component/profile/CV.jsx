@@ -110,6 +110,7 @@ function CV({ student, onEditProfile }) {
         currentSemester: profile.currentSemester || activeSemesterName || '-',
         joinSemester: profile.joinSemester || '-',
         expectedGraduate: profile.expectedGraduate || '-',
+        cvUrl: profile.cvUrl || profile.cvurl || profile.cvURL || '-',
         avatarUrl: pickAvatarUrl(profile) || null,
       };
     }
@@ -128,6 +129,7 @@ function CV({ student, onEditProfile }) {
       currentSemester: profile?.currentSemester || activeSemesterName || '-',
       joinSemester: profile?.joinSemester || '-',
       expectedGraduate: profile?.expectedGraduate || '-',
+      cvUrl: profile?.cvUrl || profile?.cvurl || profile?.cvURL || '-',
       avatarUrl: pickAvatarUrl(profile) || null,
     };
   }, [profile, activeSemesterName]);
@@ -143,6 +145,27 @@ function CV({ student, onEditProfile }) {
     const first = parts[0]?.[0] || '';
     const last = parts.length > 1 ? parts[parts.length - 1][0] : '';
     return (first + last).toUpperCase();
+  };
+
+  const extractGoogleDriveFileId = (url) => {
+    if (!url) return null;
+    const matchFile = String(url).match(/drive\.google\.com\/file\/d\/([^/]+)/);
+    if (matchFile?.[1]) return matchFile[1];
+    const matchId = String(url).match(/[?&]id=([^&]+)/);
+    if (matchId?.[1]) return matchId[1];
+    return null;
+  };
+
+  const toCvDownloadUrl = (url) => {
+    const id = extractGoogleDriveFileId(url);
+    if (!id) return url;
+    return `https://drive.google.com/uc?export=download&id=${id}`;
+  };
+
+  const handleDownloadCv = () => {
+    const url = data?.cvUrl;
+    if (!url || url === '-') return;
+    window.open(toCvDownloadUrl(url), '_blank', 'noopener,noreferrer');
   };
 
   // Applications panel state
@@ -270,13 +293,6 @@ function CV({ student, onEditProfile }) {
           <div className="cv-actions">
             <button type="button" className="btn secondary" onClick={() => navigate('/')}>{t('home')}</button>
             <button type="button" className="btn primary" onClick={handleEditProfile}>{t('edit_profile')}</button>
-            <button
-              type="button"
-              className={`btn apps-toggle ${showApps ? 'on' : ''}`}
-              onClick={() => { setShowApps(s => !s); if (!showApps) setAppsCollapsed(false); }}
-            >
-              {showApps ? 'Hide Applications' : 'My Applications'}
-            </button>
           </div>
         </div>
 
@@ -318,18 +334,17 @@ function CV({ student, onEditProfile }) {
                 <div className="label">{t('current_semester')}</div>
                 <div className="value">{data.currentSemester}</div>
               </div>
-              <div className="info-item">
-                <div className="label">{t('join_in')}</div>
-                <div className="value">{data.joinSemester}</div>
-              </div>
-              <div className="info-item">
-                <div className="label">{t('expected_graduate')}</div>
-                <div className="value">{data.expectedGraduate}</div>
-              </div>
             </div>
 
             <div className="cv-footer">
-              <button type="button" className="btn ghost" onClick={() => window.print()}>{t('download_print')}</button>
+              <button
+                type="button"
+                className="btn ghost"
+                onClick={handleDownloadCv}
+                disabled={!data?.cvUrl || data?.cvUrl === '-'}
+              >
+                {t('download_cv')}
+              </button>
             </div>
           </div>
           </div>
