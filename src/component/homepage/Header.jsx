@@ -110,6 +110,13 @@ const Header = () => {
           ) : (
             <Link to="/login"><button className="btn btn-card"><User /> <span>{t("login")}</span></button></Link>
           )}
+          {role !== "guest" && (
+  <Link to="/profile/cv" className="avatar-link">
+    <div className="avatar">
+      <User />
+    </div>
+  </Link>
+)}
         </div>
       </div>
     </header>
