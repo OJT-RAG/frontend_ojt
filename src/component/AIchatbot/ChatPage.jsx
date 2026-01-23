@@ -569,6 +569,8 @@ const ChatPage = () => {
     [sessions, activeSessionId]
   );
 
+  const isStaffSession = activeSession?.type === "staff";
+
   useEffect(() => {
     if (!activeSessionId && sessions.length > 0) {
       setActiveSessionId(sessions[0].id);
@@ -687,6 +689,11 @@ useEffect(() => {
       cvInputRef.current.value = "";
     }
   }, []);
+
+  useEffect(() => {
+    if (!isStaffSession) return;
+    if (cvFile) clearCvFile();
+  }, [isStaffSession, cvFile, clearCvFile]);
 
   const handleCvFileChange = useCallback((event) => {
     const file = event?.target?.files?.[0] || null;
@@ -1151,19 +1158,26 @@ const sendStaffMessage = async (session) => {
           <div className="chatpage-messages" ref={chatScrollRef} aria-live="polite">
             {(!activeSession || activeSession.messages.length === 0) && (
               <div className="chatpage-empty">
-                <p>{t("chat_empty_state")}</p>
-                <div className="chatpage-suggestions">
-                  {suggestedQuestions.map((suggestion, index) => (
-                    <button
-                      key={`${suggestion}-${index}`}
-                      type="button"
-                      className="suggestion-btn"
-                      onClick={() => handleSuggestionClick(suggestion)}
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
+                <p>
+                  {isStaffSession
+                    ? "No messages yet. Start your conversation with staff."
+                    : t("chat_empty_state")}
+                </p>
+
+                {!isStaffSession && (
+                  <div className="chatpage-suggestions">
+                    {suggestedQuestions.map((suggestion, index) => (
+                      <button
+                        key={`${suggestion}-${index}`}
+                        type="button"
+                        className="suggestion-btn"
+                        onClick={() => handleSuggestionClick(suggestion)}
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             )}
 
@@ -1219,56 +1233,60 @@ const sendStaffMessage = async (session) => {
           )}
 
           <form className="chatpage-input" onSubmit={handleSubmit}>
-            <div className="chatpage-file-row">
-              <input
-                ref={cvInputRef}
-                className="chatpage-file-input"
-                type="file"
-                accept={CV_ACCEPT}
-                onChange={handleCvFileChange}
-                disabled={sending}
-              />
+            {!isStaffSession && (
+              <>
+                <div className="chatpage-file-row">
+                  <input
+                    ref={cvInputRef}
+                    className="chatpage-file-input"
+                    type="file"
+                    accept={CV_ACCEPT}
+                    onChange={handleCvFileChange}
+                    disabled={sending}
+                  />
 
-              <button
-                type="button"
-                className="attach-btn"
-                onClick={() => cvInputRef.current?.click()}
-                disabled={sending}
-              >
-                <Paperclip className="attach-icon" aria-hidden="true" />
-                <span className="attach-label">
-                  {(typeof t === "function" && t("chat_attach_cv")) || "Import File"}
-                </span>
-              </button>
-
-              {cvFile && (
-                <div className="file-chip" title={cvFile.name}>
-                  <span className="file-name">{cvFile.name}</span>
                   <button
                     type="button"
-                    className="file-remove"
-                    onClick={clearCvFile}
+                    className="attach-btn"
+                    onClick={() => cvInputRef.current?.click()}
                     disabled={sending}
-                    aria-label="Remove attached CV"
-                    title="Remove"
                   >
-                    ×
+                    <Paperclip className="attach-icon" aria-hidden="true" />
+                    <span className="attach-label">
+                      {(typeof t === "function" && t("chat_attach_cv")) || "Import File"}
+                    </span>
                   </button>
-                </div>
-              )}
-            </div>
 
-            <div
-              className={cn("chatpage-model-badge", cvFile ? "is-cv" : "is-rag")}
-              role="note"
-              aria-label={modelModeLabel}
-              title={modelModeLabel}
-            >
-              <span className="model-icon" aria-hidden="true">
-                {cvFile ? <FileText size={16} /> : <Sparkles size={16} />}
-              </span>
-              <span className="model-text">{modelModeLabel}</span>
-            </div>
+                  {cvFile && (
+                    <div className="file-chip" title={cvFile.name}>
+                      <span className="file-name">{cvFile.name}</span>
+                      <button
+                        type="button"
+                        className="file-remove"
+                        onClick={clearCvFile}
+                        disabled={sending}
+                        aria-label="Remove attached CV"
+                        title="Remove"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  )}
+                </div>
+
+                <div
+                  className={cn("chatpage-model-badge", cvFile ? "is-cv" : "is-rag")}
+                  role="note"
+                  aria-label={modelModeLabel}
+                  title={modelModeLabel}
+                >
+                  <span className="model-icon" aria-hidden="true">
+                    {cvFile ? <FileText size={16} /> : <Sparkles size={16} />}
+                  </span>
+                  <span className="model-text">{modelModeLabel}</span>
+                </div>
+              </>
+            )}
 
             <div className="chatpage-input-row">
               <input
