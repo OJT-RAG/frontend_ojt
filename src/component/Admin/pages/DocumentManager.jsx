@@ -110,8 +110,9 @@ const DocumentManager = () => {
     const obj = raw && typeof raw === "object" ? raw : {};
     return {
       is_running: !!(obj.is_running ?? obj.isRunning ?? obj.running),
-      current_step: obj.current_step ?? obj.currentStep ?? "",
-      progress: obj.progress ?? "",
+      current_step: obj.current_step ?? obj.currentStep ?? obj.step ?? "",
+      detail: obj.detail ?? obj.details ?? "",
+      progress: obj.progress ?? obj.progress_text ?? obj.progressText ?? "",
       percentage: obj.percentage ?? obj.percent ?? "",
       last_finished: obj.last_finished ?? obj.lastFinished ?? null,
     };
@@ -815,16 +816,16 @@ const DocumentManager = () => {
                   <td>{syncStatus?.current_step || "-"}</td>
                 </tr>
                 <tr>
+                  <th>Detail</th>
+                  <td>{syncStatus?.detail || "-"}</td>
+                </tr>
+                <tr>
                   <th>Progress</th>
                   <td>{syncStatus?.progress || "-"}</td>
                 </tr>
                 <tr>
                   <th>Percentage</th>
                   <td>{syncStatus?.percentage || "-"}</td>
-                </tr>
-                <tr>
-                  <th>Last finished</th>
-                  <td>{syncStatus?.last_finished == null ? "-" : String(syncStatus.last_finished)}</td>
                 </tr>
                 <tr>
                   <th>Updated</th>
