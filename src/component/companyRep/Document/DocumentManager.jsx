@@ -1,74 +1,127 @@
 import React, { useEffect, useState } from "react";
 import "./DocumentManager.css";
-import companyDocumentApi from "../../API/CompanyDocumentAPI";
+import ojtDocumentApi from "../../API/OjtDocumentAPI";
+import semesterApi from "../../API/SemesterAPI";
+import { useAuth } from "../../Hook/useAuth";
 
 export default function DocumentManager() {
-  const semesterCompanyId = 4; // 🔥 semester đang chọn
-  const uploadedBy = 11;
+  const [semesterId, setSemesterId] = useState(null);
+    const { authUser } = useAuth(); // 👈 lấy user đang đăng nhập
 
+  const uploadedBy = authUser?.id; 
   const [documents, setDocuments] = useState([]);
   const [search, setSearch] = useState("");
   const [uploading, setUploading] = useState(false);
+// ===== CREATE FORM =====
+const [showUploadForm, setShowUploadForm] = useState(false);
+const [uploadTitle, setUploadTitle] = useState("");
+const [uploadFile, setUploadFile] = useState(null);
 
   // ===== UPDATE FORM =====
   const [editingDoc, setEditingDoc] = useState(null);
   const [editTitle, setEditTitle] = useState("");
   const [editFile, setEditFile] = useState(null);
 
-  // ================= LOAD DOCUMENTS =================
   useEffect(() => {
-    loadDocuments();
-  }, []);
+  loadActiveSemester();
+}, []);
 
-  const loadDocuments = async () => {
+const loadActiveSemester = async () => {
   try {
-    const res = await companyDocumentApi.getAll();
+    const res = await semesterApi.getAll();
 
-    // 🔥 LƯU Ý: data nằm trong res.data.data
+    const activeSemester = res.data.data.find(
+      (s) => s.isActive === true
+    );
+
+    if (!activeSemester) {
+      console.error("Không có semester active");
+      return;
+    }
+
+    setSemesterId(activeSemester.semesterId);
+  } catch (err) {
+    console.error("Load semester error:", err);
+  }
+};
+
+  // ================= LOAD DOCUMENTS =================
+useEffect(() => {
+  if (!semesterId) return;
+  loadDocuments();
+}, [semesterId]);
+
+
+const loadDocuments = async () => {
+  try {
+    const res = await ojtDocumentApi.getAll();
+
     const filtered = res.data.data
-      .filter(
-        (doc) => doc.semesterCompanyId === semesterCompanyId
-      )
-      .map((doc) => ({
-        id: doc.companyDocumentId,
-        name: doc.title,
-        size: "-", // backend không trả size
-        url: doc.fileUrl,
-        uploadedBy: doc.uploadedBy,
-      }));
+  .filter(
+    (doc) =>
+      doc.semesterId === semesterId &&
+      doc.uploadedBy === uploadedBy
+  )
+  .map(doc => ({
+    id: doc.ojtdocumentId,
+    name: doc.title,
+    url: doc.fileUrl,
+    uploadedBy: doc.uploadedBy,
+  }));
+
 
     setDocuments(filtered);
   } catch (err) {
-    console.error("Load documents error:", err);
+    console.error("Load OJT documents error:", err);
   }
 };
+
+
   // ================= CREATE =================
-  const handleUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
+const handleUpload = async () => {
+  if (!uploadedBy) {
+    alert("Bạn cần đăng nhập để upload");
+    return;
+  }
 
-    try {
-      setUploading(true);
+  if (!semesterId) {
+    alert("Chưa có học kỳ đang hoạt động");
+    return;
+  }
 
-      const formData = new FormData();
-      formData.append("SemesterCompanyId", semesterCompanyId);
-      formData.append("Title", file.name);
-      formData.append("UploadedBy", uploadedBy);
-      formData.append("IsPublic", true);
-      formData.append("File", file);
+  if (!uploadTitle || !uploadFile) {
+    alert("Vui lòng nhập đầy đủ thông tin");
+    return;
+  }
 
-      await companyDocumentApi.create(formData);
-      await loadDocuments();
+  try {
+    setUploading(true);
 
-      alert("Upload thành công!");
-    } catch (err) {
-      console.error(err);
-      alert("Upload thất bại!");
-    } finally {
-      setUploading(false);
-      e.target.value = "";
-    }
-  };
+    const formData = new FormData();
+    formData.append("Title", uploadTitle);
+    formData.append("SemesterId", semesterId);
+    formData.append("UploadedBy", uploadedBy);
+    formData.append("IsGeneral", true);
+    formData.append("File", uploadFile);
+
+    await ojtDocumentApi.create(formData);
+    await loadDocuments();
+
+    alert("Upload thành công!");
+
+    // reset form
+    setUploadTitle("");
+    setUploadFile(null);
+    setShowUploadForm(false);
+  } catch (err) {
+    console.error(err);
+    alert("Upload thất bại!");
+  } finally {
+    setUploading(false);
+  }
+};
+
+
 
   // ================= OPEN UPDATE =================
   const openUpdateForm = (doc) => {
@@ -78,35 +131,36 @@ export default function DocumentManager() {
   };
 
   // ================= UPDATE =================
-  const handleUpdate = async () => {
-    if (!editingDoc) return;
+const handleUpdate = async () => {
+  if (!editingDoc) return;
 
-    try {
-      setUploading(true);
+  try {
+    setUploading(true);
 
-      const formData = new FormData();
-      formData.append("CompanyDocumentId", editingDoc.id);
-      formData.append("SemesterCompanyId", semesterCompanyId);
-      formData.append("Title", editTitle);
-      formData.append("UploadedBy", uploadedBy);
-      formData.append("IsPublic", true);
+    const formData = new FormData();
+    formData.append("OjtDocumentId", editingDoc.id); // ✅
+    formData.append("SemesterId", semesterId);
+    formData.append("Title", editTitle);
+    formData.append("UploadedBy", uploadedBy);
+    formData.append("IsGeneral", true);
 
-      if (editFile) {
-        formData.append("File", editFile);
-      }
-
-      await companyDocumentApi.update(formData);
-      await loadDocuments();
-
-      alert("Cập nhật thành công!");
-      closeUpdateForm();
-    } catch (err) {
-      console.error(err);
-      alert("Cập nhật thất bại!");
-    } finally {
-      setUploading(false);
+    if (editFile) {
+      formData.append("File", editFile);
     }
-  };
+
+    await ojtDocumentApi.update(formData); // ✅
+    await loadDocuments();
+
+    alert("Cập nhật thành công!");
+    closeUpdateForm();
+  } catch (err) {
+    console.error(err);
+    alert("Cập nhật thất bại!");
+  } finally {
+    setUploading(false);
+  }
+};
+
 
   const closeUpdateForm = () => {
     setEditingDoc(null);
@@ -125,16 +179,26 @@ export default function DocumentManager() {
 
       {/* ACTIONS */}
       <div className="doc-actions">
-        <input
-          placeholder="Tìm tài liệu..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-        />
+        <div className="doc-search-wrapper">
+  <span className="search-icon">🔍</span>
+  <input
+    className="doc-search"
+    placeholder="Tìm kiếm tài liệu..."
+    value={search}
+    onChange={(e) => setSearch(e.target.value)}
+  />
+</div>
 
-        <label className="upload-btn">
-          Upload
-          <input type="file" hidden onChange={handleUpload} />
-        </label>
+
+        <button
+  className="upload-btn"
+  disabled={!uploadedBy || !semesterId}
+  onClick={() => setShowUploadForm(true)}
+>
+  Upload
+</button>
+
+
       </div>
 
       {/* TABLE */}
@@ -174,6 +238,54 @@ export default function DocumentManager() {
     )}
   </tbody>
 </table>
+{showUploadForm && (
+  <div className="modal-overlay" onClick={() => setShowUploadForm(false)}>
+    <div
+      className="modal-content"
+      onClick={(e) => e.stopPropagation()}
+    >
+      <h3>Upload tài liệu</h3>
+
+      <div className="form-group">
+        <label>Tiêu đề</label>
+        <input
+          value={uploadTitle}
+          onChange={(e) => setUploadTitle(e.target.value)}
+          placeholder="Nhập tiêu đề tài liệu"
+        />
+      </div>
+
+      <div className="form-group">
+        <label>File</label>
+        <input
+          type="file"
+          onChange={(e) => setUploadFile(e.target.files[0])}
+        />
+        {uploadFile && (
+          <small className="file-name">
+            Đã chọn: {uploadFile.name}
+          </small>
+        )}
+      </div>
+
+      <div className="form-actions">
+        <button
+          onClick={handleUpload}
+          disabled={uploading || !uploadTitle || !uploadFile}
+        >
+          {uploading ? "Đang upload..." : "Upload"}
+        </button>
+
+        <button
+          className="cancel-btn"
+          onClick={() => setShowUploadForm(false)}
+        >
+          Hủy
+        </button>
+      </div>
+    </div>
+  </div>
+)}
 
 
       {/* UPDATE FORM */}

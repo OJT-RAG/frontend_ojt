@@ -32,7 +32,7 @@ const timeAgo = (dateString) => {
   const hours = Math.floor(minutes / 60);
   const days = Math.floor(hours / 24);
   const months = Math.floor(days / 30);
-
+  
   if (seconds < 60) return "vừa xong";
   if (minutes < 60) return `${minutes} phút trước`;
   if (hours < 24) return `${hours} giờ trước`;
@@ -49,37 +49,72 @@ const KnowledgeBase = () => {
   const kbTitleFirst = kbTitleParts[0] || "";
   const kbTitleRest = kbTitleParts.length > 1 ? kbTitleParts.slice(1).join(" ") : "";
   const navigate = useNavigate();
+  const [categoryCounts, setCategoryCounts] = useState({});
 
-  const categories = [
-    {
-      icon: FileText,
-      title: t("kb_cat_policies_title"),
-      description: t("kb_cat_policies_desc"),
-      count: 24,
-      color: "kb-cat-primary"
-    },
-    {
-      icon: Calendar,
-      title: t("kb_cat_application_title"),
-      description: t("kb_cat_application_desc"),
-      count: 18,
-      color: "kb-cat-accent"
-    },
-    {
-      icon: Building,
-      title: t("kb_cat_companies_title"),
-      description: t("kb_cat_companies_desc"),
-      count: 156,
-      color: "kb-cat-primary"
-    },
-    {
-      icon: Users,
-      title: t("kb_cat_mentors_title"),
-      description: t("kb_cat_mentors_desc"),
-      count: 12,
-      color: "kb-cat-accent"
-    }
-  ];
+  const categoriesConfig = [
+  {
+    key: "system",
+    icon: FileText,
+    title: t("kb_cat_policies_title"),
+    description: t("kb_cat_policies_desc"),
+    color: "kb-cat-primary"
+  },
+  {
+    key: "university",
+    icon: Calendar,
+    title: t("kb_cat_application_title"),
+    description: t("kb_cat_application_desc"),
+    color: "kb-cat-accent"
+  },
+  {
+    key: "company",
+    icon: Building,
+    title: t("kb_cat_companies_title"),
+    description: t("kb_cat_companies_desc"),
+    color: "kb-cat-primary"
+  }
+];
+useEffect(() => {
+  loadCategoryCounts();
+}, []);
+
+const loadCategoryCounts = async () => {
+  try {
+    const results = await Promise.all(
+      categoriesConfig.map(cat =>
+        documentApi.getByTagType(cat.key)
+      )
+    );
+
+    const counts = {};
+
+    results.forEach((res, idx) => {
+      const tagKey = categoriesConfig[idx].key;
+        console.log(
+    "TAG:",
+    categoriesConfig[idx].key,
+    "STATUS:",
+    res?.status,
+    "DATA:",
+    res?.data
+  );
+      const raw = res?.data;
+      const data = Array.isArray(raw)
+        ? raw
+        : Array.isArray(raw?.data)
+          ? raw.data
+          : [];
+
+      counts[tagKey] = data.length;
+    });
+
+    setCategoryCounts(counts);
+  } catch (err) {
+    console.error("Load category counts failed", err);
+  }
+};
+
+
 useEffect(() => {
   loadRecentUpdates();
 }, []);
@@ -131,35 +166,32 @@ const loadRecentUpdates = async () => {
           <p className="kb-sub">{t("kb_sub")}</p>
         </div>
 
-        {/* Search */}
-        <div className="kb-search">
-          <div className="kb-search-inner">
-            <Search className="kb-search-icon" />
-            <Input
-              placeholder={t("kb_search_placeholder")}
-              className="kb-input"
-            />
-          </div>
-        </div>
-
         {/* Categories */}
         <div className="kb-grid">
-          {categories.map((cat, idx) => (
-            <Card key={idx} className="kb-card">
-              <div className={`kb-cat ${cat.color}`}>
-                <cat.icon className="kb-icon" />
-              </div>
-              <h3 className="kb-cat-title">{cat.title}</h3>
-              <p className="kb-cat-desc">{cat.description}</p>
-              <div className="kb-card-footer">
-                <Badge variant="outline" className="kb-count">
-                  {cat.count} {t("kb_items")}
-                </Badge>
-                <ArrowRight className="kb-arrow" />
-              </div>
-            </Card>
-          ))}
-        </div>
+  {categoriesConfig.map((cat) => (
+    <Card
+      key={cat.key}
+      className="kb-card"
+      onClick={() => navigate(`/ojt?tag=${cat.key}`)}
+      style={{ cursor: "pointer" }}
+    >
+      <div className={`kb-cat ${cat.color}`}>
+        <cat.icon className="kb-icon" />
+      </div>
+
+      <h3 className="kb-cat-title">{cat.title}</h3>
+      <p className="kb-cat-desc">{cat.description}</p>
+
+      <div className="kb-card-footer">
+        <Badge variant="outline" className="kb-count">
+          {categoryCounts[cat.key] ?? 0} {t("kb_items")}
+        </Badge>
+        <ArrowRight className="kb-arrow" />
+      </div>
+    </Card>
+  ))}
+</div>
+
 
         {/* Recent Updates – FULL WIDTH */}
         <div className="kb-panels kb-panels-single">
