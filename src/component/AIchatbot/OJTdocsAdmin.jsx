@@ -3,7 +3,7 @@ import Toastify from "toastify-js";
 import "toastify-js/src/toastify.css";
 import "./OJTdocsAdmin.scss";
 
-const DEFAULT_RAG_BASE = "https://ojt-rag-python.onrender.com";
+const DEFAULT_RAG_BASE = "https://trongnhan312-ojt-rag-bot.hf.space";
 const RAGDOCS_URL_MAP_KEY = "ragdocs_import_url_map_v1";
 
 const isProbablyUrl = (value) => {
@@ -118,27 +118,12 @@ const OJTdocsAdmin = () => {
 	const [importing, setImporting] = useState(false);
 	const [deleting, setDeleting] = useState(null);
 	const [error, setError] = useState("");
-	const [status, setStatus] = useState({ state: "checking", message: "" });
 	const [urlInput, setUrlInput] = useState("");
 
 	const baseUrl = useMemo(() => {
 		const env = process.env.REACT_APP_RAG_API_BASE_URL;
 		return sanitizeBaseUrl(env || DEFAULT_RAG_BASE);
 	}, []);
-
-	const fetchStatus = async () => {
-		try {
-			const res = await fetch(`${baseUrl}/status`);
-			const payload = await res.json().catch(() => ({}));
-			setStatus({
-				state: res.ok ? "online" : "offline",
-				message: payload?.status || payload?.message || res.statusText,
-			});
-		} catch (err) {
-			console.error("Status check failed", err);
-			setStatus({ state: "offline", message: err.message });
-		}
-	};
 
 	const loadFiles = async () => {
 		setLoading(true);
@@ -310,10 +295,7 @@ const OJTdocsAdmin = () => {
 	};
 
 	useEffect(() => {
-		fetchStatus();
 		loadFiles();
-		const timer = setInterval(fetchStatus, 60000);
-		return () => clearInterval(timer);
 	}, []);
 
 	return (
@@ -323,10 +305,6 @@ const OJTdocsAdmin = () => {
 					<p className="eyebrow">RAGdocs Manage</p>
 					<h1>Quản lý tài liệu RAG</h1>
 					<p className="sub">CRUD tài liệu mà AI chatbot sử dụng để trả lời.</p>
-				</div>
-				<div className={`status-chip ${status.state}`}>
-					<span className="dot" />
-					<span>{status.message || status.state}</span>
 				</div>
 			</div>
 

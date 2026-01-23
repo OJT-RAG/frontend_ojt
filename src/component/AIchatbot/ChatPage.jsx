@@ -16,7 +16,7 @@ import userChatApi from "../API/UserChatAPI";
 import { FileText, Paperclip, Sparkles } from "lucide-react";
 
 const LOCAL_STORAGE_KEY = "ojt-rag-chat-sessions";
-const DEFAULT_RAG_BASE = "https://ojt-rag-python.onrender.com";
+const DEFAULT_RAG_BASE = "https://trongnhan312-ojt-rag-bot.hf.space";
 
 const sanitizeBaseUrl = (value) => {
   if (!value || typeof value !== "string") return "";
@@ -334,6 +334,35 @@ const interpretStatus = (payload) => {
   return "unknown";
 };
 
+const buildNetworkHint = (error, url) => {
+  const message = (error?.message || "").toLowerCase();
+  const isAbort = error?.name === "AbortError";
+
+  if (isAbort) {
+    return "Request timed out. The RAG server may be slow/unreachable.";
+  }
+
+  // Browsers usually return TypeError: Failed to fetch for CORS/network failures.
+  if (error instanceof TypeError || message.includes("failed to fetch") || message.includes("networkerror")) {
+    return (
+      "Network/CORS blocked the request. " +
+      `Check the browser Console/Network tab for CORS errors. URL: ${url}`
+    );
+  }
+
+  return "";
+};
+
+const fetchWithTimeout = async (url, options, timeoutMs = 60_000) => {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+};
+
 const ChatPage = () => {
   const { t } = useI18n();
   const initialSessionsRef = useRef(null);
@@ -352,6 +381,19 @@ const ChatPage = () => {
 const currentUserId = currentUser
   ? Number(currentUser.userId ?? currentUser.id)
   : null;
+
+  const currentUserRole = useMemo(() => {
+    const fromUser = typeof currentUser?.role === "string" ? currentUser.role : "";
+    if (fromUser) return fromUser.toLowerCase();
+    try {
+      return (localStorage.getItem("userRole") || "").toLowerCase();
+    } catch {
+      return "";
+    }
+  }, [currentUser]);
+
+  // Only students can chat with staff (admin/company must not).
+  const canChatWithStaff = currentUserRole === "student";
 
   if (initialSessionsRef.current === null) {
     const stored = loadStoredSessions(t);
@@ -384,6 +426,26 @@ const currentUserId = currentUser
   const [activeSessionId, setActiveSessionId] = useState(
     initialSessionsRef.current[0]?.id || null
   );
+
+  useEffect(() => {
+    if (canChatWithStaff) return;
+
+    setSessions((prev) => {
+      const filtered = prev.filter((s) => s?.type !== "staff");
+
+      if (filtered.length === 0) {
+        const next = createLocalSession(t, 1);
+        setActiveSessionId(next.id);
+        return [next];
+      }
+
+      if (activeSessionId && !filtered.some((s) => s.id === activeSessionId)) {
+        setActiveSessionId(filtered[0].id);
+      }
+
+      return filtered;
+    });
+  }, [canChatWithStaff, activeSessionId, t]);
 
   const handleIncomingStaffMessage = useCallback(
   (message) => {
@@ -442,8 +504,6 @@ const currentUserId = currentUser
   const [inputValue, setInputValue] = useState("");
   const [cvFile, setCvFile] = useState(null);
   const [sending, setSending] = useState(false);
-  const [loadingHistory, setLoadingHistory] = useState(false);
-  const [serviceStatus, setServiceStatus] = useState({ state: "checking", lastChecked: null });
   const [lastError, setLastError] = useState("");
   const [appConfig, setAppConfig] = useState(null);
 
@@ -517,6 +577,10 @@ const currentUserId = currentUser
   const [staffList, setStaffList] = useState([]);
 
 useEffect(() => {
+  if (!canChatWithStaff) {
+    setStaffList([]);
+    return;
+  }
   const loadStaff = async () => {
     try {
       const res = await userApi.getAll();
@@ -530,126 +594,8 @@ useEffect(() => {
   };
 
   loadStaff();
-}, []);
+}, [canChatWithStaff]);
 
-  useEffect(() => {
-    if (!ragBaseUrl) return;
-
-    let cancelled = false;
-
-    const fetchStatus = async () => {
-      try {
-        const response = await fetch(`${ragBaseUrl}/status`, {
-          headers: { Accept: "application/json" },
-        });
-        let payload = null;
-        const contentType = response.headers.get("content-type") || "";
-        if (contentType.includes("application/json")) {
-          payload = await response.json();
-        } else {
-          const text = await response.text();
-          payload = text;
-        }
-        if (!cancelled) {
-          setServiceStatus({
-            state: interpretStatus(payload),
-            lastChecked: nowIso(),
-          });
-        }
-      } catch (error) {
-        if (!cancelled) {
-          setServiceStatus({ state: "offline", lastChecked: nowIso(), error: error.message });
-        }
-      }
-    };
-
-    const fetchHistory = async () => {
-      setLoadingHistory(true);
-      try {
-        const response = await fetch(`${ragBaseUrl}/history`, {
-          headers: { Accept: "application/json" },
-        });
-        if (!response.ok) {
-          const text = await response.text();
-          console.error("History request failed", {
-            url: `${ragBaseUrl}/history`,
-            status: response.status,
-            statusText: response.statusText,
-            body: text,
-          });
-          throw new Error(`HTTP ${response.status}`);
-        }
-        let payload = null;
-        const contentType = response.headers.get("content-type") || "";
-        if (contentType.includes("application/json")) {
-          payload = await response.json();
-        } else {
-          const text = await response.text();
-          try {
-            payload = JSON.parse(text);
-          } catch (error) {
-            payload = null;
-          }
-        }
-        const historySessions = prepareHistorySessions(payload, t);
-        if (!cancelled && historySessions.length > 0) {
-          setSessions((prev) => mergeSessions(prev, historySessions));
-        }
-      } catch (error) {
-        if (!cancelled) {
-          console.error("Failed to load chat history", error);
-        }
-      } finally {
-        if (!cancelled) {
-          setLoadingHistory(false);
-        }
-      }
-    };
-
-    fetchStatus();
-    fetchHistory();
-
-    const interval = setInterval(fetchStatus, 60_000);
-
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [ragBaseUrl, t]);
-
-  const refreshHistory = useCallback(async () => {
-    if (!ragBaseUrl) return;
-    setLoadingHistory(true);
-    try {
-      const response = await fetch(`${ragBaseUrl}/history`, {
-        headers: { Accept: "application/json" },
-      });
-      if (!response.ok) throw new Error(`HTTP ${response.status}`);
-      let payload = null;
-      const contentType = response.headers.get("content-type") || "";
-      if (contentType.includes("application/json")) {
-        payload = await response.json();
-      } else {
-        const text = await response.text();
-        try {
-          payload = JSON.parse(text);
-        } catch (error) {
-          payload = null;
-        }
-      }
-      const historySessions = prepareHistorySessions(payload, t);
-      if (historySessions.length > 0) {
-        setSessions((prev) => mergeSessions(prev, historySessions));
-      }
-      setLastError("");
-    } catch (error) {
-      console.error("Failed to refresh chat history", error);
-      const message = error?.message ? `${t("chat_message_failed")} (${error.message})` : t("chat_message_failed");
-      setLastError(message);
-    } finally {
-      setLoadingHistory(false);
-    }
-  }, [ragBaseUrl, t]);
 
   const handleCreateSession = () => {
     setLastError("");
@@ -757,6 +703,7 @@ useEffect(() => {
   }, [t]);
   useEffect(() => {
   if (!activeSession || activeSession.type !== "staff" || !activeSession.staffId) return;
+  if (!canChatWithStaff) return;
 
   // load lần đầu
   loadStaffConversation(activeSession);
@@ -774,6 +721,7 @@ const staffId = activeSession.staffId;
 }, [activeSessionId, activeSession?.staffId]);
 
   const loadStaffConversation = async (session) => {
+  if (!canChatWithStaff) return;
   if (!currentUserId || !session?.staffId) return;
 
   try {
@@ -817,6 +765,10 @@ const staffId = activeSession.staffId;
 };
 
 const sendStaffMessage = async (session) => {
+  if (!canChatWithStaff) {
+    setLastError("Staff chat is only available for students");
+    return;
+  }
   console.log("🧪 sendStaffMessage debug", {
   currentUserId,
   session,
@@ -858,6 +810,10 @@ const sendStaffMessage = async (session) => {
 
   // ✅ HARD BLOCK AI IF STAFF CHAT
   if (currentSession?.type === "staff") {
+    if (!canChatWithStaff) {
+      setLastError("Staff chat is only available for students");
+      return;
+    }
     if (!inputValue.trim()) {
       setLastError("Please enter a message for staff");
       return;
@@ -957,7 +913,17 @@ const sendStaffMessage = async (session) => {
       if (currentSession?.type === "staff") {
   throw new Error("Staff session must not call AI");
 }
-      const response = await fetch(`${ragBaseUrl}/chat`, {
+      const chatUrl = `${ragBaseUrl}/chat`;
+      console.groupCollapsed("[ChatPage] POST /chat");
+      console.log({
+        chatUrl,
+        origin: typeof window !== "undefined" ? window.location.origin : "(server)",
+        hasFile: !!cvFile,
+        questionLength: question.length,
+        sessionId,
+      });
+
+      const response = await fetchWithTimeout(chatUrl, {
         method: "POST",
         headers: {
           Accept: "application/json",
@@ -968,18 +934,29 @@ const sendStaffMessage = async (session) => {
       const contentType = response.headers.get("content-type") || "";
       let payload = null;
       if (contentType.includes("application/json")) {
-        payload = await response.json();
+        payload = await response.json().catch(async () => {
+          const text = await response.text().catch(() => "");
+          return text;
+        });
       } else {
         payload = await response.text();
       }
 
+      console.log({
+        status: response.status,
+        ok: response.ok,
+        contentType,
+        payloadPreview: typeof payload === "string" ? payload.slice(0, 300) : payload,
+      });
+
       if (!response.ok) {
         console.error("Chat request failed", {
-          url: `${ragBaseUrl}/chat`,
+          url: chatUrl,
           status: response.status,
           statusText: response.statusText,
           payload,
         });
+        console.groupEnd();
         throw new Error(
           typeof payload === "string"
             ? payload
@@ -1016,9 +993,24 @@ const sendStaffMessage = async (session) => {
       if (cvFile) {
         clearCvFile();
       }
+
+      console.groupEnd();
     } catch (error) {
-      console.error("Chat request failed", error);
-      const message = error?.message || t("chat_message_failed");
+      const chatUrl = `${ragBaseUrl}/chat`;
+      const hint = buildNetworkHint(error, chatUrl);
+      console.error("[ChatPage] Chat request failed", {
+        chatUrl,
+        origin: typeof window !== "undefined" ? window.location.origin : "(server)",
+        error,
+        hint,
+      });
+      try {
+        console.groupEnd();
+      } catch {
+        // ignore
+      }
+
+      const message = hint || error?.message || t("chat_message_failed");
       setLastError(message);
       setSessions((prev) =>
         prev.map((session) =>
@@ -1043,7 +1035,7 @@ const sendStaffMessage = async (session) => {
     } finally {
       setSending(false);
     }
-  }, [sending, inputValue, activeSessionId, ragBaseUrl, t, cvFile, clearCvFile,sendStaffMessage,]);
+  }, [sending, inputValue, activeSessionId, ragBaseUrl, t, cvFile, clearCvFile, sendStaffMessage, canChatWithStaff, sessions]);
 
   const handleSuggestionClick = (suggestion) => {
     setInputValue(suggestion);
@@ -1062,12 +1054,9 @@ const sendStaffMessage = async (session) => {
     return (typeof t === "function" && t("chat_model_rag")) || "Model: RAG Mode";
   }, [cvFile, t]);
 
-  const statusLabel =
-    serviceStatus.state === "online"
-      ? t("chat_status_ready")
-      : serviceStatus.state === "offline"
-      ? t("chat_status_error")
-      : t("chat_service_checking");
+  const visibleSessions = useMemo(() => {
+    return canChatWithStaff ? sessions : sessions.filter((s) => s?.type !== "staff");
+  }, [canChatWithStaff, sessions]);
 
   return (
     <div className="chatpage-root">
@@ -1077,40 +1066,33 @@ const sendStaffMessage = async (session) => {
             <button className="new-session-btn" onClick={handleCreateSession} type="button">
               {t("chat_new_session")}
             </button>
-            <button
-  className="staff-chat-btn"
-  type="button"
-  onClick={() => {
-    const staff = pickStaffRoundRobin(staffList);
+            {canChatWithStaff && (
+              <button
+                className="staff-chat-btn"
+                type="button"
+                onClick={() => {
+                  const staff = pickStaffRoundRobin(staffList);
 
-    if (!staff) {
-      setLastError("No staff available");
-      return;
-    }
+                  if (!staff) {
+                    setLastError("No staff available");
+                    return;
+                  }
 
-    const session = createStaffSession(staff);
-    if (!session) return;
+                  const session = createStaffSession(staff);
+                  if (!session) return;
 
-    setSessions(prev => [session, ...prev]);
-    setActiveSessionId(session.id);
-  }}
->
-  Chat with staff
-</button>
+                  setSessions((prev) => [session, ...prev]);
+                  setActiveSessionId(session.id);
+                }}
+              >
+                Chat with staff
+              </button>
+            )}
 
-
-            <button
-              className="refresh-history-btn"
-              onClick={refreshHistory}
-              type="button"
-              disabled={loadingHistory}
-            >
-              {loadingHistory ? t("chat_loading_history") : t("chat_history_refresh")}
-            </button>
           </div>
 
           <div className="session-list">
-            {sessions.map((session, index) => {
+            {visibleSessions.map((session, index) => {
               const displayTitle =
   session.type === "staff"
     ? session.title
@@ -1155,28 +1137,10 @@ const sendStaffMessage = async (session) => {
               <h1>{t("chat_ask_anything")}</h1>
               <p>{t("chat_sub")}</p>
             </div>
-            <div
-              className={cn(
-                "chatpage-status",
-                serviceStatus.state === "online" && "is-online",
-                serviceStatus.state === "offline" && "is-offline"
-              )}
-              role="status"
-              aria-live="polite"
-            >
-              <span className={cn("status-indicator", `status-${serviceStatus.state}`)} />
-              <span>{statusLabel}</span>
-            </div>
           </header>
 
           <div className="chatpage-messages" ref={chatScrollRef} aria-live="polite">
-            {loadingHistory && (
-              <div className="chatpage-loading">
-                <span>{t("chat_loading_history")}</span>
-              </div>
-            )}
-
-            {!loadingHistory && (!activeSession || activeSession.messages.length === 0) && (
+            {(!activeSession || activeSession.messages.length === 0) && (
               <div className="chatpage-empty">
                 <p>{t("chat_empty_state")}</p>
                 <div className="chatpage-suggestions">

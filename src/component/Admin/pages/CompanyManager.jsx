@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import './CompanyManager.scss';
 import companyApi from '../../API/CompanyAPI';
+import Toastify from 'toastify-js';
+import 'toastify-js/src/toastify.css';
 
 const CompanyManager = () => {
   const [loading, setLoading] = useState(true);
@@ -74,11 +76,120 @@ const CompanyManager = () => {
     c?.company_ID ?? c?.Company_ID ?? c?.companyId ?? c?.CompanyId ?? c?.id ?? c?.Id
   );
 
+  const getCompanyName = (c) => String(c?.name ?? '').trim();
+
+  const getCompanyTaxCode = (c) =>
+    String(c?.tax_Code ?? c?.taxCode ?? '').trim();
+
   const getVerified = (c) => {
     if (typeof c?.is_Verified === 'boolean') return c.is_Verified;
     if (typeof c?.isVerified === 'boolean') return c.isVerified;
     if (typeof c?.is_verified === 'boolean') return c.is_verified;
     return false;
+  };
+
+  const showToast = (type, text) => {
+    const background =
+      type === 'success'
+        ? 'linear-gradient(135deg, #1f9d57, #34d399)'
+        : type === 'warning'
+          ? 'linear-gradient(135deg, #b45309, #f59e0b)'
+          : 'linear-gradient(135deg, #b91c1c, #ef4444)';
+
+    Toastify({
+      text: String(text || ''),
+      duration: 2500,
+      gravity: 'top',
+      position: 'right',
+      close: true,
+      stopOnFocus: true,
+      style: { background },
+    }).showToast();
+  };
+
+  const normalizeName = (v) => String(v || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const normalizeTaxCode = (v) => String(v || '').trim();
+  const normalizeAddress = (v) => String(v || '').trim().replace(/\s+/g, ' ').toLowerCase();
+  const normalizeEmail = (v) => String(v || '').trim().toLowerCase();
+  const normalizePhone = (v) => String(v || '').trim();
+  const normalizeWebsite = (v) => {
+    const raw = String(v || '').trim().toLowerCase();
+    if (!raw) return '';
+    // Remove trailing slashes and common protocol prefixes for comparison.
+    const noProto = raw.replace(/^https?:\/\//, '');
+    return noProto.replace(/\/+$/, '');
+  };
+
+  const validateDuplicate = (form, currentId) => {
+    const name = normalizeName(form?.name);
+    const taxCode = normalizeTaxCode(form?.tax_Code);
+    const address = normalizeAddress(form?.address);
+    const website = normalizeWebsite(form?.website);
+    const contactEmail = normalizeEmail(form?.contact_Email);
+    const phone = normalizePhone(form?.phone);
+    const currentNumericId = currentId != null ? Number(currentId) : null;
+
+    if (name) {
+      const dupName = companies.some((c) => {
+        const id = getCompanyId(c);
+        const idNum = id != null ? Number(id) : null;
+        if (currentNumericId != null && idNum === currentNumericId) return false;
+        return normalizeName(getCompanyName(c)) === name;
+      });
+      if (dupName) return 'Duplicate company name.';
+    }
+
+    if (taxCode) {
+      const dupTax = companies.some((c) => {
+        const id = getCompanyId(c);
+        const idNum = id != null ? Number(id) : null;
+        if (currentNumericId != null && idNum === currentNumericId) return false;
+        return normalizeTaxCode(getCompanyTaxCode(c)) === taxCode;
+      });
+      if (dupTax) return 'Duplicate tax code.';
+    }
+
+    if (address) {
+      const dupAddress = companies.some((c) => {
+        const id = getCompanyId(c);
+        const idNum = id != null ? Number(id) : null;
+        if (currentNumericId != null && idNum === currentNumericId) return false;
+        return normalizeAddress(c?.address) === address;
+      });
+      if (dupAddress) return 'Duplicate address.';
+    }
+
+    if (website) {
+      const dupWebsite = companies.some((c) => {
+        const id = getCompanyId(c);
+        const idNum = id != null ? Number(id) : null;
+        if (currentNumericId != null && idNum === currentNumericId) return false;
+        return normalizeWebsite(c?.website) === website;
+      });
+      if (dupWebsite) return 'Duplicate website.';
+    }
+
+    if (contactEmail) {
+      const dupEmail = companies.some((c) => {
+        const id = getCompanyId(c);
+        const idNum = id != null ? Number(id) : null;
+        if (currentNumericId != null && idNum === currentNumericId) return false;
+        return normalizeEmail(c?.contact_Email ?? c?.contactEmail) === contactEmail;
+      });
+      if (dupEmail) return 'Duplicate contact email.';
+    }
+
+    if (phone) {
+      const dupPhone = companies.some((c) => {
+        const id = getCompanyId(c);
+        const idNum = id != null ? Number(id) : null;
+        if (currentNumericId != null && idNum === currentNumericId) return false;
+        return normalizePhone(c?.phone) === phone;
+      });
+      if (dupPhone) return 'Duplicate phone.';
+    }
+
+    return null;
   };
 
   const resetCreate = () => {
@@ -137,15 +248,34 @@ const CompanyManager = () => {
   };
 
   const validateForm = (f) => {
-    if (!String(f.name || '').trim()) return 'Company name is required.';
-    if (!String(f.tax_Code || '').trim()) return 'Tax code is required.';
+    const name = String(f?.name || '').trim();
+    const taxCode = String(f?.tax_Code || '').trim();
+    const phone = String(f?.phone || '').trim();
+
+    if (!name) return 'Company name is required.';
+    if (/\d/.test(name)) return 'Company name cannot contain numbers.';
+
+    if (!taxCode) return 'Tax code is required.';
+    // Must be a non-negative number with exactly 10 digits (allow leading zeros).
+    if (!/^\d{10}$/.test(taxCode)) return 'Tax code must be exactly 10 digits (e.g., 0100101010).';
+
+    // Phone must follow format XXX-XXXXXXXX (e.g., 024-73008888).
+    // Keep optional: only validate when provided.
+    if (phone && !/^\d{3}-\d{8}$/.test(phone)) return 'Phone must follow format 024-73008888.';
+
     return null;
   };
 
   const saveCreate = async () => {
     const msg = validateForm(createForm);
     if (msg) {
-      window.alert(msg);
+      showToast('error', msg);
+      return;
+    }
+
+    const dupMsg = validateDuplicate(createForm, null);
+    if (dupMsg) {
+      showToast('warning', dupMsg);
       return;
     }
 
@@ -165,15 +295,22 @@ const CompanyManager = () => {
       await refreshCompanies();
       setCreating(false);
       resetCreate();
+      showToast('success', 'Company created successfully.');
     } catch (e) {
-      window.alert(e?.response?.data?.message || e?.message || 'Create failed');
+      showToast('error', e?.response?.data?.message || e?.message || 'Create failed');
     }
   };
 
   const saveEdit = async (id) => {
     const msg = validateForm(editForm);
     if (msg) {
-      window.alert(msg);
+      showToast('error', msg);
+      return;
+    }
+
+    const dupMsg = validateDuplicate(editForm, id);
+    if (dupMsg) {
+      showToast('warning', dupMsg);
       return;
     }
 
@@ -193,20 +330,26 @@ const CompanyManager = () => {
       await companyApi.update(payload);
       await refreshCompanies();
       cancelEdit();
+      showToast('success', 'Company updated successfully.');
     } catch (e) {
-      window.alert(e?.response?.data?.message || e?.message || 'Update failed');
+      showToast('error', e?.response?.data?.message || e?.message || 'Update failed');
     }
   };
 
-  const deleteCompany = async (id) => {
+  const deleteCompany = async (id, isApproved) => {
+    if (isApproved) {
+      showToast('warning', "Can't delete: company is Approved.");
+      return;
+    }
     const ok = window.confirm('Delete this company?');
     if (!ok) return;
     try {
       await companyApi.deleteById(id);
       setCompanies((prev) => prev.filter((c) => Number(getCompanyId(c)) !== Number(id)));
       if (editingId === id) cancelEdit();
+      showToast('success', 'Company deleted successfully.');
     } catch (e) {
-      window.alert(e?.response?.data?.message || e?.message || 'Delete failed');
+      showToast('error', e?.response?.data?.message || e?.message || 'Delete failed');
     }
   };
 
@@ -253,6 +396,7 @@ const CompanyManager = () => {
                     value={createForm.tax_Code}
                     onChange={(e) => setCreateForm((p) => ({ ...p, tax_Code: e.target.value }))}
                     placeholder="Tax code"
+                    inputMode="numeric"
                   />
                 </td>
                 <td>
@@ -294,7 +438,10 @@ const CompanyManager = () => {
                     className="cm-input"
                     value={createForm.phone}
                     onChange={(e) => setCreateForm((p) => ({ ...p, phone: e.target.value }))}
-                    placeholder="Phone"
+                    placeholder="024-73008888"
+                    inputMode="tel"
+                    pattern="\d{3}-\d{8}"
+                    title="Format: 024-73008888"
                   />
                 </td>
                 <td>
@@ -342,6 +489,7 @@ const CompanyManager = () => {
                           className="cm-input"
                           value={editForm.tax_Code}
                           onChange={(e) => setEditForm((p) => ({ ...p, tax_Code: e.target.value }))}
+                          inputMode="numeric"
                         />
                       ) : (
                         c?.tax_Code ?? c?.taxCode ?? '-'
@@ -404,6 +552,10 @@ const CompanyManager = () => {
                           className="cm-input"
                           value={editForm.phone}
                           onChange={(e) => setEditForm((p) => ({ ...p, phone: e.target.value }))}
+                          inputMode="tel"
+                          placeholder="024-73008888"
+                          pattern="\d{3}-\d{8}"
+                          title="Format: 024-73008888"
                         />
                       ) : (
                         c?.phone ?? '-'
@@ -418,7 +570,16 @@ const CompanyManager = () => {
                       ) : (
                         <>
                           <button type="button" onClick={() => startEdit(c)} disabled={numericId == null}>Edit</button>
-                          <button className="btn-danger" type="button" style={{ marginLeft: 10 }} onClick={() => deleteCompany(numericId)} disabled={numericId == null}>Delete</button>
+                          <button
+                            className="btn-danger"
+                            type="button"
+                            style={{ marginLeft: 10 }}
+                            onClick={() => deleteCompany(numericId, verified)}
+                            disabled={numericId == null}
+                            title={verified ? "Can't delete: Approved" : 'Delete'}
+                          >
+                            Delete
+                          </button>
                         </>
                       )}
                     </td>

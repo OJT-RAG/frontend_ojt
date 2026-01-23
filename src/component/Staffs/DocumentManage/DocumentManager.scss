@@ -5,11 +5,12 @@
   overflow: hidden; // 🔒 CHỐT
 
   .card {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    min-height: 0;
+  }
 
   .toolbar {
     margin-bottom: 1rem;
@@ -58,12 +59,12 @@
     min-width: 90px;
     justify-content: center;
   }
-.dm-table-wrapper {
-  flex: 1;                // 🔥 chiếm chiều cao còn lại
-  overflow-y: auto;       // ✅ CHỈ SCROLL Ở ĐÂY
-  margin-top: 0.75rem;
-  min-height: 400px;
-}
+  .dm-table-wrapper {
+    flex: 1 1 auto; // 🔥 chiếm chiều cao còn lại
+    overflow-y: auto; // ✅ CHỈ SCROLL Ở ĐÂY
+    margin-top: 0.75rem;
+    min-height: 0;
+  }
   .dm-table {
   th:nth-child(2),
   td:nth-child(2) {

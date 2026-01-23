@@ -78,9 +78,38 @@ const UpdateUserPage = ({ userId = 0 }) => {
       }
 
       await userApi.update(fd);
-      navigate("/profile/cv", {
+
+      // Keep local authUser in sync so profile renders immediately.
+      try {
+        const raw = localStorage.getItem("authUser");
+        const authUser = raw ? JSON.parse(raw) : null;
+        if (authUser && typeof authUser === "object") {
+          const nextAuthUser = {
+            ...authUser,
+            id: authUser?.id ?? userIdValue,
+            fullname: values.fullname ?? authUser.fullname,
+            studentCode: values.studentCode ?? authUser.studentCode,
+            phone: values.phone ?? authUser.phone,
+            dob: values.dob ? values.dob.format("YYYY-MM-DD") : (authUser.dob ?? ""),
+            majorId:
+              values.majorId === 0 || values.majorId === "0"
+                ? ""
+                : (values.majorId ?? authUser.majorId),
+            companyId:
+              values.companyId === 0 || values.companyId === "0"
+                ? ""
+                : (values.companyId ?? authUser.companyId),
+          };
+          localStorage.setItem("authUser", JSON.stringify(nextAuthUser));
+        }
+      } catch {
+        // ignore localStorage parse/write failures
+      }
+
+      // Go back to the Student dashboard and open the Profile tab.
+      navigate("/student", {
         replace: true,
-        state: { profileUpdated: true },
+        state: { activeModule: "profile", profileUpdated: true },
       });
     } catch (error) {
       console.error(error);

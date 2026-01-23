@@ -8,7 +8,7 @@ import userApi from '../API/UserAPI.js';
 import { pickAvatarUrl } from '../lib/utils.jsx';
 import semesterApi from '../API/SemesterAPI.js';
 
-function CV({ student }) {
+function CV({ student, onEditProfile }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { t } = useI18n();
@@ -228,6 +228,11 @@ function CV({ student }) {
 
   // Decorative text logo only; no navigation to avoid accidental redirects
 
+  const handleEditProfile = () => {
+    if (typeof onEditProfile === 'function') return onEditProfile();
+    navigate('/profile/update');
+  };
+
   return (
     <div className="cv-page">
       {/* animated background layer */}
@@ -264,7 +269,7 @@ function CV({ student }) {
           <h1>{t('cv_title')}</h1>
           <div className="cv-actions">
             <button type="button" className="btn secondary" onClick={() => navigate('/')}>{t('home')}</button>
-            <button type="button" className="btn primary" onClick={() => navigate('/profile/update')}>{t('edit_profile')}</button>
+            <button type="button" className="btn primary" onClick={handleEditProfile}>{t('edit_profile')}</button>
             <button
               type="button"
               className={`btn apps-toggle ${showApps ? 'on' : ''}`}

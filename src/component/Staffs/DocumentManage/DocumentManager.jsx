@@ -4,11 +4,30 @@ import ojtDocumentApi from "../../API/OjtDocumentAPI";
 import semesterApi from "../../API/SemesterAPI";
 import { useAuth } from "../../Hook/useAuth";
 
-const DEFAULT_RAG_BASE = "https://ojt-rag-python.onrender.com";
+const DEFAULT_RAG_BASE = "https://trongnhan312-ojt-rag-bot.hf.space";
 
 const sanitizeBaseUrl = (value) => {
   if (!value || typeof value !== "string") return "";
   return value.trim().replace(/\/$/, "");
+};
+
+const DOCUMENT_TAG_OPTIONS = [
+  { id: 1, name: "Internship Guide" },
+  { id: 2, name: "Company Profile" },
+  { id: 3, name: "Project Requirements" },
+  { id: 4, name: "Evaluation Form" },
+  { id: 5, name: "Technical Documentation" },
+  { id: 6, name: "Resume Template" },
+];
+
+const getDocumentTagId = (tag) => tag?.documenttagId ?? tag?.documentTagId ?? tag?.id;
+
+const resolveDocumentTagName = (tag) => {
+  const name = typeof tag?.name === "string" ? tag.name.trim() : "";
+  if (name) return name;
+  const tagId = Number(getDocumentTagId(tag));
+  const found = DOCUMENT_TAG_OPTIONS.find((item) => item.id === tagId);
+  return found?.name || (tagId ? `Tag #${tagId}` : "Tag");
 };
 
 const DocumentManager = () => {
@@ -51,9 +70,15 @@ const DocumentManager = () => {
   const [syncLastUpdatedAt, setSyncLastUpdatedAt] = useState(null);
   const [syncPolling, setSyncPolling] = useState(false);
   const [syncHasStarted, setSyncHasStarted] = useState(false);
+  const [syncForce, setSyncForce] = useState(false);
 
   const [tagsByDocId, setTagsByDocId] = useState({});
   const [tagsLoadingByDocId, setTagsLoadingByDocId] = useState({});
+
+  const [addTagOpen, setAddTagOpen] = useState(false);
+  const [addTagDocId, setAddTagDocId] = useState(null);
+  const [addTagValue, setAddTagValue] = useState("");
+  const [addTagSaving, setAddTagSaving] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -343,7 +368,8 @@ const DocumentManager = () => {
     return Object.prototype.hasOwnProperty.call(tagsByDocId, key) ? tagsByDocId[key] : null;
   };
 
-  const loadTagsForDocument = async (docId) => {
+  const loadTagsForDocument = async (docId, options) => {
+    const silent = !!options?.silent;
     const key = String(docId);
     if (tagsLoadingByDocId[key]) return getCachedTags(docId) || [];
 
@@ -357,7 +383,9 @@ const DocumentManager = () => {
     } catch (e) {
       const status = e?.response?.status;
       const serverMessage = e?.response?.data?.message || e?.response?.data?.title;
-      window.alert(serverMessage || (status ? `Failed to load tags (HTTP ${status})` : e?.message || "Failed to load tags"));
+      if (!silent) {
+        window.alert(serverMessage || (status ? `Failed to load tags (HTTP ${status})` : e?.message || "Failed to load tags"));
+      }
       setTagsByDocId((prev) => ({ ...prev, [key]: [] }));
       return [];
     } finally {
@@ -365,21 +393,51 @@ const DocumentManager = () => {
     }
   };
 
-  const addTagToDocument = async (docId) => {
-    const raw = window.prompt("Enter Document Tag ID to add:", "");
-    if (raw == null) return;
-    const tagId = Number(String(raw).trim());
-    if (!Number.isFinite(tagId) || tagId <= 0) {
-      window.alert("Invalid tag id.");
+  const closeAddTag = () => {
+    if (addTagSaving) return;
+    setAddTagOpen(false);
+    setAddTagDocId(null);
+    setAddTagValue("");
+  };
+
+  const addTagToDocument = (docId) => {
+    if (!docId) return;
+    const cached = getCachedTags(docId);
+    const loading = !!tagsLoadingByDocId[String(docId)];
+    if (loading || cached == null) return;
+    if (Array.isArray(cached) && cached.length > 0) return;
+    setAddTagDocId(docId);
+    setAddTagValue("");
+    setAddTagOpen(true);
+  };
+
+  const submitAddTag = async (event) => {
+    event?.preventDefault?.();
+    const docId = addTagDocId;
+    const tagId = Number(String(addTagValue).trim());
+
+    if (!docId) return;
+    const cached = getCachedTags(docId);
+    if (Array.isArray(cached) && cached.length > 0) {
+      window.alert("This document already has a tag. Please remove it first.");
       return;
     }
+    if (!Number.isFinite(tagId) || tagId <= 0) {
+      window.alert("Please choose a tag.");
+      return;
+    }
+
     try {
+      setAddTagSaving(true);
       await ojtDocumentApi.addTag(docId, tagId);
       await loadTagsForDocument(docId);
+      closeAddTag();
     } catch (e) {
       const status = e?.response?.status;
       const serverMessage = e?.response?.data?.message || e?.response?.data?.title;
       window.alert(serverMessage || (status ? `Add tag failed (HTTP ${status})` : e?.message || "Add tag failed"));
+    } finally {
+      setAddTagSaving(false);
     }
   };
 
@@ -405,14 +463,17 @@ const DocumentManager = () => {
       return;
     }
 
+    const forceParam = syncForce ? "true" : "false";
+
     setSyncingNow(true);
     setSyncPolling(false);
     setSyncHasStarted(false);
     setSyncStatusError("");
-    setSyncNotice("Syncing latest data… This may take a few minutes.");
+    setSyncNotice(`Syncing latest data (force=${forceParam})… This may take a few minutes.`);
 
     try {
-      const response = await fetch(`${ragBaseUrl}/SyncNow`, {
+      const response = await fetch(`${ragBaseUrl}/SyncNow?force=${forceParam}`,
+      {
         method: "GET",
         headers: { Accept: "application/json" },
       });
@@ -605,6 +666,35 @@ const pagedDocuments = useMemo(() => {
   return filteredDocuments.slice(start, start + PAGE_SIZE);
 }, [filteredDocuments, page]);
 
+  useEffect(() => {
+    let cancelled = false;
+    const candidates = (pagedDocuments || []).map((doc) => getDocId(doc)).filter(Boolean);
+
+    const missing = candidates.filter((docId) => {
+      const key = String(docId);
+      return getCachedTags(docId) == null && !tagsLoadingByDocId[key];
+    });
+
+    if (missing.length === 0) return;
+
+    (async () => {
+      const concurrency = 3;
+      const queue = [...missing];
+      const runners = Array.from({ length: Math.min(concurrency, queue.length) }, async () => {
+        while (!cancelled && queue.length > 0) {
+          const nextId = queue.shift();
+          if (!nextId) continue;
+          await loadTagsForDocument(nextId, { silent: true });
+        }
+      });
+      await Promise.all(runners);
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [pagedDocuments, tagsByDocId, tagsLoadingByDocId]);
+
   return (
     <div className="admin-page document-manager">
       <div className="page-header">
@@ -618,6 +708,22 @@ const pagedDocuments = useMemo(() => {
             <button className="btn-primary" type="button" onClick={() => setUploadOpen(true)}>
               Upload New Document
             </button>
+            <label
+              className="dm-sync-force"
+              style={{ display: "inline-flex", alignItems: "center", gap: 8, marginLeft: 10 }}
+              title="When force=true, the server may re-sync everything."
+            >
+              <span style={{ opacity: 0.8, fontSize: 13 }}>Force</span>
+              <select
+                value={String(syncForce)}
+                onChange={(e) => setSyncForce(e.target.value === "true")}
+                disabled={syncingNow}
+                style={{ padding: "6px 8px", borderRadius: 8 }}
+              >
+                <option value="false">false</option>
+                <option value="true">true</option>
+              </select>
+            </label>
             <button
               className="btn-secondary dm-sync-btn"
               type="button"
@@ -739,26 +845,21 @@ const pagedDocuments = useMemo(() => {
                         {actionsDisabled ? (
                           <span className="dm-tags-empty">-</span>
                         ) : tags == null ? (
-                          <button
-                            className="btn-secondary dm-tags-load"
-                            type="button"
-                            onClick={() => loadTagsForDocument(id)}
-                            disabled={tagsLoading}
-                          >
-                            {tagsLoading ? "Loading…" : "Load tags"}
-                          </button>
+                          <span className="dm-tags-empty">{tagsLoading ? "Loading…" : "Loading…"}</span>
                         ) : tags.length === 0 ? (
                           <span className="dm-tags-empty">—</span>
                         ) : (
                           <div className="dm-tag-list">
                             {tags.map((tag) => {
-                              const tagId = tag?.documenttagId ?? tag?.documentTagId ?? tag?.id;
-                              const tagName = typeof tag?.name === "string" ? tag.name : "";
-                              const chipLabel = tagName ? `#${tagId} ${tagName}` : `#${tagId}`;
+                              const tagId = getDocumentTagId(tag);
+                              const tagName = resolveDocumentTagName(tag);
                               return (
-                                <span key={`tag-${id}-${tagId}`} className="dm-tag-chip" title={chipLabel}
+                                <span
+                                  key={`tag-${id}-${tagId}`}
+                                  className="dm-tag-chip"
+                                  title={tagId ? `#${tagId}` : ""}
                                 >
-                                  <span className="dm-tag-name">{chipLabel}</span>
+                                  <span className="dm-tag-name">{tagName}</span>
                                   <button
                                     type="button"
                                     className="dm-tag-remove"
@@ -773,13 +874,12 @@ const pagedDocuments = useMemo(() => {
                           </div>
                         )}
 
-                        {!actionsDisabled && (
+                        {!actionsDisabled && Array.isArray(tags) && tags.length === 0 && !tagsLoading && (
                           <button
                             className="btn-secondary dm-tag-add"
                             type="button"
                             onClick={() => addTagToDocument(id)}
-                            disabled={tagsLoading}
-                            title="Add tag by id"
+                            title="Add tag"
                           >
                             + Tag
                           </button>
@@ -907,6 +1007,41 @@ const pagedDocuments = useMemo(() => {
                 </button>
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {addTagOpen && (
+        <div className="dm-modal-overlay" onClick={closeAddTag}>
+          <div className="dm-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Add Tag</h3>
+
+            <form className="dm-form" onSubmit={submitAddTag}>
+              <label>
+                Document tag
+                <select
+                  autoFocus
+                  value={addTagValue}
+                  onChange={(e) => setAddTagValue(e.target.value)}
+                >
+                  <option value="">Select a tag...</option>
+                  {DOCUMENT_TAG_OPTIONS.map((tag) => (
+                    <option key={tag.id} value={String(tag.id)}>
+                      {tag.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+
+              <div className="dm-form-actions">
+                <button className="btn-primary" type="submit" disabled={addTagSaving}>
+                  {addTagSaving ? "Adding..." : "Add"}
+                </button>
+                <button className="btn-secondary" type="button" onClick={closeAddTag} disabled={addTagSaving}>
+                  Cancel
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       )}

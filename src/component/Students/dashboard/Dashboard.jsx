@@ -1,18 +1,32 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar.jsx";
 import PdfManager from "../../pages/pdf/pdfManager.jsx";
 import FinalReportPage from "../StudentsReport/FinalReportPage.jsx";
 import UpdateUserPage from "../userProfile/UpdateUserPage.jsx";
 import StudentJobsPage from "../jobs/StudentJobsPage.jsx";
+import CV from "../../profile/CV.jsx";
 import "./Dashboard.css";
 
 const Dashboard = () => {
+  const location = useLocation();
+
   // Mặc định module PDF active
-  const [activeModule, setActiveModule] = useState("pdf"); 
+  const [activeModule, setActiveModule] = useState("pdf");
+
+  // Allow deep-linking to a dashboard module via navigation state
+  useEffect(() => {
+    const next = location?.state?.activeModule;
+    if (typeof next === "string" && next.length > 0) {
+      setActiveModule(next);
+    }
+  }, [location?.state]);
 
   // Render nội dung module tương ứng
   const renderContent = () => {
     switch (activeModule) {
+      case "profile":
+        return <CV onEditProfile={() => setActiveModule("updateuser")} />;
       case "pdf":
         return <PdfManager />; 
       case "finalreport":

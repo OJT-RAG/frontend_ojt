@@ -7,6 +7,14 @@ const Sidebar = ({ activeModule, setActiveModule }) => {
     <aside className="sidebar">
       <h2 className="sidebar-title">Modules</h2>
 
+      {/* Nút Hồ sơ */}
+      <button
+        className={`sidebar-btn ${activeModule === "profile" ? "active" : ""}`}
+        onClick={() => setActiveModule("profile")}
+      >
+        <FileText /> Hồ sơ
+      </button>
+
       {/* Nút Quản lý PDF */}
       <button
         className={`sidebar-btn ${activeModule === "pdf" ? "active" : ""}`}
