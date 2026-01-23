@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from "react";
 import { Button, Card, Form, Select, Table, Tag, message, Popconfirm, Alert } from "antd";
 import semesterApi from "../../API/SemesterAPI";
 import companySemesterApi from "../../API/CompanySemesterAPI";
+import companyApi from "../../API/CompanyAPI";
 
 const resolveSemesterId = (sc) => sc?.semesterId ?? sc?.semesterID;
 const resolveCompanyId = (sc) => sc?.companyId ?? sc?.companyID ?? sc?.company_ID;
@@ -10,9 +11,37 @@ const resolveSemesterCompanyId = (sc) => sc?.semesterCompanyId ?? sc?.semesterCo
 const isApproved = (sc) => Boolean(sc?.approvedAt);
 
 const getCompanyIdFromStorage = () => {
-  const raw = localStorage.getItem("company_id");
+  const raw =
+    localStorage.getItem("company_id") ??
+    localStorage.getItem("company_ID") ??
+    localStorage.getItem("companyId");
   const parsed = Number(raw);
   return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+const getCompanyVerified = (c) => {
+  if (typeof c?.is_Verified === "boolean") return c.is_Verified;
+  if (typeof c?.isVerified === "boolean") return c.isVerified;
+  if (typeof c?.is_verified === "boolean") return c.is_verified;
+  if (typeof c?.isActive === "boolean") return c.isActive;
+
+  const rawStatus = c?.status ?? c?.companyStatus ?? c?.state;
+  const status = String(rawStatus ?? "").trim().toLowerCase();
+  if (!status) return true;
+
+  const approved = new Set(["approved", "approve", "verified", "active", "enabled"]);
+  const blocked = new Set([
+    "pending",
+    "unapproved",
+    "not approve",
+    "not_approve",
+    "disabled",
+    "inactive",
+    "rejected",
+  ]);
+  if (approved.has(status)) return true;
+  if (blocked.has(status)) return false;
+  return true;
 };
 
 const isDebugEnabled = () => {
@@ -37,6 +66,7 @@ export default function SemesterCompanyPage() {
   const [loading, setLoading] = useState(false);
   const [semesters, setSemesters] = useState([]);
   const [records, setRecords] = useState([]);
+  const [companyVerified, setCompanyVerified] = useState(null);
 
   const companyId = useMemo(() => getCompanyIdFromStorage(), []);
 
@@ -73,9 +103,10 @@ export default function SemesterCompanyPage() {
     debugLog("fetchAll() start", { companyId });
     setLoading(true);
     try {
-      const [semesterRes, companySemRes] = await Promise.all([
+      const [semesterRes, companySemRes, companyRes] = await Promise.all([
         semesterApi.getAll(),
         companyId ? companySemesterApi.getByCompany(companyId) : Promise.resolve({ data: { data: [] } }),
+        companyId ? companyApi.getById(companyId) : Promise.resolve(null),
       ]);
 
       const semesterList = Array.isArray(semesterRes?.data)
@@ -99,6 +130,13 @@ export default function SemesterCompanyPage() {
         form.setFieldsValue({ semesterId: activeId });
         debugLog("Defaulted semesterId in form", { semesterId: activeId });
       }
+
+      if (companyId) {
+        const payload = companyRes?.data?.data ?? companyRes?.data ?? null;
+        setCompanyVerified(getCompanyVerified(payload));
+      } else {
+        setCompanyVerified(null);
+      }
     } catch (err) {
       console.error("Failed to load semester-company data:", err);
       debugLog("fetchAll() error", {
@@ -107,6 +145,7 @@ export default function SemesterCompanyPage() {
         message: err?.message,
       });
       message.error("Không thể tải dữ liệu Semester Company");
+      setCompanyVerified(true);
     } finally {
       setLoading(false);
       debugLog("fetchAll() done");
@@ -122,6 +161,12 @@ export default function SemesterCompanyPage() {
     if (!companyId) {
       message.error("Thiếu company_id trong localStorage");
       debugLog("handleCreate blocked: missing companyId");
+      return;
+    }
+
+    if (companyVerified === false) {
+      message.error("Công ty chưa được duyệt hoặc đã bị vô hiệu hoá. Không thể đăng ký học kỳ.");
+      debugLog("handleCreate blocked: company not verified", { companyId });
       return;
     }
 
@@ -238,6 +283,16 @@ export default function SemesterCompanyPage() {
           />
         )}
 
+        {companyId && companyVerified === false && (
+          <Alert
+            type="error"
+            showIcon
+            message="Công ty chưa được duyệt"
+            description="Công ty của bạn đang ở trạng thái chưa được duyệt / bị vô hiệu hoá nên không thể tạo Semester Company. Vui lòng liên hệ admin."
+            style={{ marginBottom: 12 }}
+          />
+        )}
+
         <Form form={form} layout="inline">
           <Form.Item
             name="semesterId"
@@ -248,6 +303,7 @@ export default function SemesterCompanyPage() {
               style={{ minWidth: 260 }}
               placeholder="Chọn học kỳ"
               loading={loading}
+              disabled={loading || !companyId || companyVerified === false}
               options={availableSemesterOptions.map((s) => ({
                 value: s.id,
                 label: `${s.name}${s.isActive ? " (Active)" : ""}`,
@@ -256,7 +312,12 @@ export default function SemesterCompanyPage() {
           </Form.Item>
 
           <Form.Item>
-            <Button type="primary" onClick={handleCreate} loading={loading} disabled={!companyId}>
+            <Button
+              type="primary"
+              onClick={handleCreate}
+              loading={loading}
+              disabled={!companyId || companyVerified === false}
+            >
               Gửi yêu cầu
             </Button>
           </Form.Item>
