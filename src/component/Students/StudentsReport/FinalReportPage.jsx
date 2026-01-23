@@ -222,7 +222,7 @@ const FinalReportPage = () => {
       style={{
         maxWidth: 260,
         width: "100%",
-        opacity: 0.95,
+        
       }}
     />
     <div style={{ marginTop: 8, fontWeight: 600 }}>
