@@ -21,10 +21,17 @@ const Header = () => {
   const isActive = (path) => location.pathname === path;
 
   const handleLogout = () => {
-    logout();
-    setIsLangOpen(false);
-    navigate("/login", { replace: true });
-  };
+  // 🔥 CLEAR STAFF CỐ ĐỊNH KHI LOGOUT
+  if (authUser?.id || authUser?.userId) {
+    const userId = authUser.userId ?? authUser.id;
+    localStorage.removeItem(`fixed_staff_for_user_${userId}`);
+  }
+
+  logout();
+  setIsLangOpen(false);
+  navigate("/login", { replace: true });
+};
+
 
   const refreshActiveSemester = useCallback(async () => {
     try {

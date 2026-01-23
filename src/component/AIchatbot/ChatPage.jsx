@@ -18,6 +18,7 @@ import { FileText, Paperclip, Sparkles } from "lucide-react";
 
 const LOCAL_STORAGE_KEY = "ojt-rag-chat-sessions";
 const DEFAULT_RAG_BASE = "https://trongnhan312-ojt-rag-bot.hf.space";
+const STAFF_FIXED_KEY = "fixed_staff_for_student";
 
 const sanitizeBaseUrl = (value) => {
   if (!value || typeof value !== "string") return "";
@@ -68,7 +69,26 @@ const formatSource = (source) => {
   const fallback = String(source);
   return { key: fallback, label: fallback, href: "" };
 };
+const getFixedStaff = (staffList, studentId) => {
+  if (!Array.isArray(staffList) || staffList.length === 0) return null;
+  if (!studentId) return null;
 
+  const map = JSON.parse(localStorage.getItem(STAFF_FIXED_KEY) || "{}");
+
+  // ✅ đã có staff → dùng lại
+  if (map[studentId]) {
+    return staffList.find(s => s.userId === map[studentId]) || null;
+  }
+
+  // ✅ chưa có → pick round-robin
+  const picked = pickStaffRoundRobin(staffList);
+  if (!picked) return null;
+
+  map[studentId] = picked.userId;
+  localStorage.setItem(STAFF_FIXED_KEY, JSON.stringify(map));
+
+  return picked;
+};
 const CV_ACCEPT = [
   ".pdf",
   ".doc",
@@ -128,7 +148,7 @@ const normalizeSession = (session, translate, indexFallback = 1) => {
   staffId: session.staffId,
   };
 };
-
+  
 const getSessionTitle = (translate, index = 1) => {
   const template = translate?.("chat_session_title_template");
   if (typeof template === "string" && template.length > 0) {
@@ -407,7 +427,7 @@ const ChatPage = () => {
   }
 
   return {
-    id: `staff-${staffUserId}-${Date.now()}`,
+    id: `staff-${staffUserId}`,
     remoteId: `staff-${staffUserId}`,
     staffId: staffUserId,          // 🔥 QUAN TRỌNG
     title: `Chat with ${staff.fullname || staff.email}`,
@@ -607,7 +627,24 @@ useEffect(() => {
   loadStaff();
 }, [canChatWithStaff]);
 
+useEffect(() => {
+  if (!canChatWithStaff) return;
+  if (!currentUserId) return;
+  if (staffList.length === 0) return;
 
+  // ✅ đã có staff session thì thôi
+  const hasStaffSession = sessions.some(s => s.type === "staff");
+  if (hasStaffSession) return;
+
+  const staff = getFixedStaff(staffList, currentUserId);
+  if (!staff) return;
+
+  const session = createStaffSession(staff);
+  if (!session) return;
+
+  setSessions(prev => [session, ...prev]);
+  setActiveSessionId(session.id);
+}, [staffList, currentUserId, canChatWithStaff]);
   const handleCreateSession = () => {
     setLastError("");
     const nextSession = createLocalSession(t, sessions.length + 1);
@@ -1087,7 +1124,7 @@ const sendStaffMessage = async (session) => {
                 className="staff-chat-btn"
                 type="button"
                 onClick={() => {
-                  const staff = pickStaffRoundRobin(staffList);
+                  const staff = getFixedStaff(staffList, currentUserId);
 
                   if (!staff) {
                     setLastError("No staff available");
