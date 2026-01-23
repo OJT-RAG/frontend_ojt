@@ -378,7 +378,11 @@ const DocumentManager = () => {
     try {
       setTagsLoadingByDocId((prev) => ({ ...prev, [key]: true }));
       const res = await ojtDocumentApi.getTags(docId);
-      const list = Array.isArray(res?.data) ? res.data : res?.data?.data;
+      const payload = res?.data;
+      const list =
+        (Array.isArray(payload) ? payload : null) ||
+        (Array.isArray(payload?.tags) ? payload.tags : null) ||
+        (Array.isArray(payload?.data) ? payload.data : null);
       const tags = Array.isArray(list) ? list : [];
       setTagsByDocId((prev) => ({ ...prev, [key]: tags }));
       return tags;
