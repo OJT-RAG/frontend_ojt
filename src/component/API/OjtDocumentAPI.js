@@ -3,6 +3,8 @@ import httpClient from "./httpClient";
 const ojtDocumentApi = {
   getAll: () => httpClient.get("/OjtDocument/getAll"),
   getById: (id) => httpClient.get(`/OjtDocument/get/${id}`),
+  getByTagType: (tagType) =>
+  httpClient.get(`/OjtDocument/by-tag-type/${tagType}`),
 
   // Expect multipart/form-data
   create: (formData) => httpClient.post("/OjtDocument/create", formData),
