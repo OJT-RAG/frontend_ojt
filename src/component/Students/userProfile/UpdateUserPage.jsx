@@ -1,5 +1,8 @@
 import React, { useState, useEffect } from "react";
-import { Form, Input, Button, DatePicker, Upload, message } from "antd";
+import { Form, Input, Button, DatePicker, Upload, message, Select } from "antd";
+import majorApi from "../../API/MajorAPI";
+import companyApi from "../../API/CompanyAPI";
+
 import { useNavigate } from "react-router-dom";
 import moment from "moment";
 import userApi from "../../API/UserAPI";
@@ -11,6 +14,8 @@ const UpdateUserPage = ({ userId = 0 }) => {
   const [loading, setLoading] = useState(false);
   const [avatarFileList, setAvatarFileList] = useState([]);
   const [cvFileList, setCvFileList] = useState([]);
+  const [majors, setMajors] = useState([]);
+  const [companyName, setCompanyName] = useState("");
 
   const resolvedUserId = React.useMemo(() => {
     if (userId && Number(userId) > 0) return Number(userId);
@@ -24,29 +29,62 @@ const UpdateUserPage = ({ userId = 0 }) => {
 
   // Fetch dữ liệu user khi component mount
   useEffect(() => {
-    const fetchUser = async () => {
-      try {
-        if (!resolvedUserId) {
-          message.warning("Missing userId. Please login first.");
-          return;
-        }
-
-        const res = await userApi.getById(resolvedUserId);
-        const data = res?.data?.data ?? res?.data ?? {};
-        form.setFieldsValue({
-          ...data,
-          majorId: data?.majorId ?? "",
-          companyId: data?.companyId ?? "",
-          dob: data?.dob ? moment(data.dob) : null,
-        });
-      } catch (error) {
-        console.error(error);
-        message.error("Failed to fetch user data");
+  const fetchUser = async () => {
+    try {
+      if (!resolvedUserId) {
+        message.warning("Missing userId. Please login first.");
+        return;
       }
-    };
 
-    fetchUser();
-  }, [resolvedUserId, form]);
+      // 1️⃣ Fetch user
+      const res = await userApi.getById(resolvedUserId);
+      const data = res?.data?.data ?? res?.data ?? {};
+
+      // 2️⃣ Set form values
+      form.setFieldsValue({
+        ...data,
+        majorId: data?.majorId ?? "",
+        companyId: data?.companyId ?? "",
+        dob: data?.dob ? moment(data.dob) : null,
+      });
+
+      // 3️⃣ Fetch company name (nếu có companyId)
+      if (data?.companyId) {
+        try {
+          const companyRes = await companyApi.getById(data.companyId);
+          const companyData =
+            companyRes?.data?.data ?? companyRes?.data ?? {};
+          setCompanyName(companyData?.name || "");
+        } catch (err) {
+          console.error("Failed to fetch company", err);
+          setCompanyName("");
+        }
+      } else {
+        setCompanyName("");
+      }
+    } catch (error) {
+      console.error(error);
+      message.error("Failed to fetch user data");
+    }
+  };
+
+  fetchUser();
+}, [resolvedUserId, form]);
+
+  useEffect(() => {
+  const fetchMajors = async () => {
+    try {
+      const res = await majorApi.getAll();
+      const list = res?.data?.data ?? res?.data ?? [];
+      setMajors(list);
+    } catch (err) {
+      console.error(err);
+      message.error("Failed to load majors");
+    }
+  };
+
+  fetchMajors();
+}, []);
 
   const onFinish = async (values) => {
     setLoading(true);
@@ -132,13 +170,26 @@ const UpdateUserPage = ({ userId = 0 }) => {
           <Input />
         </Form.Item>
 
-        <Form.Item name="majorId" label="Major ID">
-          <Input type="number" />
-        </Form.Item>
+        <Form.Item
+  name="majorId"
+  label="Major"
+  rules={[{ required: true, message: "Please select a major" }]}
+>
+  <Select
+    placeholder="Select major"
+    optionFilterProp="label"
+    showSearch
+    options={majors.map((m) => ({
+      label: m.majorTitle, // 👈 HIỂN THỊ
+      value: m.majorId,    // 👈 GỬI LÊN BACKEND
+    }))}
+  />
+</Form.Item>
 
-        <Form.Item name="companyId" label="Company ID">
-          <Input type="number" />
-        </Form.Item>
+
+        <Form.Item label="Company">
+  <Input value={companyName} disabled />
+</Form.Item>
 
         <Form.Item
           name="fullname"

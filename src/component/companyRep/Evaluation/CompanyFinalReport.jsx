@@ -10,6 +10,8 @@ import {
   Spin,
 } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
+import jobApplicationApi from "../../API/JobApplicationAPI";
+import companySemesterApi from "../../API/CompanySemesterAPI";
 
 import finalReportApi from "../../API/FinalReportAPI";
 import userApi from "../../API/UserAPI";
@@ -23,10 +25,36 @@ export default function CompanyCreateFinalReport() {
 
   const [loading, setLoading] = useState(false);
   const [pdfFile, setPdfFile] = useState(null);
+  const filterJobPositionsForCompany = (list, scList, companyId) => {
+  const companyIdNum = Number(companyId);
+  if (!companyIdNum) return [];
+
+  const scCompanyIdByScId = new Map();
+
+  for (const sc of scList || []) {
+    const scId = Number(resolveSemesterCompanyId(sc));
+    const scCompanyId = Number(resolveCompanyId(sc));
+
+    if (scId && scCompanyId) {
+      scCompanyIdByScId.set(scId, scCompanyId);
+    }
+  }
+
+  return (list || []).filter((jp) => {
+    const directCompanyId = Number(resolveJobPositionCompanyId(jp));
+    if (directCompanyId) {
+      return directCompanyId === companyIdNum;
+    }
+
+    const scId = Number(resolveJobPositionSemesterCompanyId(jp));
+    return scCompanyIdByScId.get(scId) === companyIdNum;
+  });
+};
 
   const [students, setStudents] = useState([]);
   const [jobPositions, setJobPositions] = useState([]);
   const [activeSemester, setActiveSemester] = useState(null);
+  const [studentJobMap, setStudentJobMap] = useState({});
 
   const isStudentUser = (u) => {
     if (!u) return false;
@@ -34,51 +62,134 @@ export default function CompanyCreateFinalReport() {
     const roleText = String(u.role ?? u.roleName ?? "").toLowerCase();
     return roleText === "student";
   };
+  const handleStudentChange = (userId) => {
+  const jobPositionId = studentJobMap[userId];
 
+  if (jobPositionId) {
+    form.setFieldsValue({
+      jobPositionId,
+    });
+  } else {
+    form.setFieldsValue({
+      jobPositionId: undefined,
+    });
+  }
+};
   // ===================== LOAD DATA =====================
   const fetchData = async () => {
-    setLoading(true);
-    try {
-      const [userRes, jobRes, semesterRes] = await Promise.all([
-        userApi.getAll(),
-        jobPositionApi.getAll(),
-        semesterApi.getAll(),
-      ]);
+  setLoading(true);
+  try {
+    const companyId = getCompanyIdFromStorage();
+    if (!companyId) return;
 
-      /* ================= STUDENT (roleId = 3) ================= */
-      const allUsers = userRes.data.data || [];
-      const studentOnly = allUsers.filter(isStudentUser);
-      setStudents(studentOnly);
+    const [
+      appRes,
+      userRes,
+      jobRes,
+      semesterRes,
+      scRes,
+      reportRes, // ✅ BẮT REPORT
+    ] = await Promise.all([
+      jobApplicationApi.getAll(),
+      userApi.getAll(),
+      jobPositionApi.getAll(),
+      semesterApi.getAll(),
+      companySemesterApi.getByCompany(companyId).catch(() => ({ data: { data: [] } })),
+      finalReportApi.getAll(),
+    ]);
 
-      /* ================= JOB POSITION ================= */
-      setJobPositions(jobRes.data.data || []);
+    const apps = appRes?.data?.data || [];
+    const users = userRes?.data?.data || [];
+    const allJobPositions = jobRes?.data?.data || [];
+    const semesters = semesterRes?.data?.data || [];
+    const semesterCompanies = scRes?.data?.data || [];
+    const reports = reportRes?.data?.data || [];
 
-      /* ================= ACTIVE SEMESTER ================= */
-      const semesters = semesterRes.data.data || [];
-      const active = semesters.find((s) => s.isActive === true);
-
-      if (!active) {
-        notification.error({
-          message: "Không có học kỳ đang hoạt động",
-        });
-        return;
-      }
-
-      setActiveSemester(active);
-
-      // set semester name để hiển thị
-      form.setFieldsValue({
-        semesterName: active.name,
-      });
-    } catch (err) {
-      notification.error({
-        message: "Lỗi tải dữ liệu",
-        description: err.message,
-      });
-    } finally {
-      setLoading(false);
+    const active = semesters.find((s) => s.isActive);
+    if (!active) {
+      notification.error({ message: "Không có học kỳ đang hoạt động" });
+      return;
     }
-  };
+
+    setActiveSemester(active);
+    form.setFieldsValue({ semesterName: active.name });
+
+    // ===== Job positions của company =====
+    const visibleJobPositions = filterJobPositionsForCompany(
+      allJobPositions,
+      semesterCompanies,
+      companyId
+    );
+    setJobPositions(visibleJobPositions);
+
+    const allowedJobPositionIds = new Set(
+      visibleJobPositions.map(resolveJobPositionId)
+    );
+
+    // ===== Application accepted =====
+    const acceptedApps = apps.filter(
+      (a) =>
+        a.status === "accepted" &&
+        allowedJobPositionIds.has(a.jobPositionId)
+    );
+
+    // ===== Map student -> job =====
+    const map = {};
+    acceptedApps.forEach((app) => {
+      map[app.userId] = app.jobPositionId;
+    });
+    setStudentJobMap(map);
+
+    const acceptedUserIds = new Set(acceptedApps.map((a) => a.userId));
+
+    // ===== 🔥 USER ĐÃ ĐƯỢC CHẤM =====
+    const gradedUserIds = new Set(
+  reports
+    .filter((r) => {
+      const semesterId = resolveReportSemesterId(r);
+      const reportUserId = resolveReportUserId(r);
+      const reportJobId =
+        r?.jobPositionId ?? r?.jobPosition?.jobPositionId;
+
+      if (Number(semesterId) !== Number(active.semesterId)) return false;
+
+      // ✅ check company chuẩn
+      const cId = resolveReportCompanyId(r);
+      if (cId && Number(cId) === Number(companyId)) return true;
+
+      // ⚠️ PHÒNG THỦ: dùng map LOCAL
+      return (
+        Number(reportUserId) &&
+        Number(reportJobId) &&
+        Number(map[reportUserId]) === Number(reportJobId)
+      );
+    })
+    .map(resolveReportUserId)
+);
+
+
+
+    // ===== 🔥 CHỈ LẤY STUDENT CHƯA ĐƯỢC CHẤM =====
+    const acceptedStudents = users.filter((u) => {
+      const uid = resolveUserId(u);
+      return (
+        acceptedUserIds.has(uid) &&
+        isStudentUser(u) &&
+        !gradedUserIds.has(uid)
+      );
+    });
+
+    setStudents(acceptedStudents);
+  } catch (err) {
+    notification.error({
+      message: "Lỗi tải dữ liệu",
+      description: err.message,
+    });
+  } finally {
+    setLoading(false);
+  }
+};
+
 
   useEffect(() => {
     fetchData();
@@ -90,8 +201,61 @@ export default function CompanyCreateFinalReport() {
     return false;
   };
 
+
+  const getCompanyIdFromStorage = () => {
+  const raw = localStorage.getItem("company_id");
+  const parsed = Number(raw);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : null;
+};
+
+
+const resolveUserId = (u) => u?.userId ?? u?.id ?? u?.UserId;
+const normalizeRole = (role) => String(role || "").toLowerCase();
+const resolveReportUserId = (r) =>
+  r?.userId ?? r?.user?.userId;
+
+const resolveReportSemesterId = (r) =>
+  r?.semesterId ??
+  r?.semester?.semesterId ??
+  r?.SemesterId;
+
+const resolveReportCompanyId = (r) =>
+  r?.companyId ??
+  r?.company?.companyId ??
+  r?.CompanyId;
+
+const resolveJobPositionId = (jp) =>
+  jp?.jobPositionId ?? jp?.jobPositionID ?? jp?.jobPositionid;
+
+const resolveJobPositionCompanyId = (jp) =>
+  jp?.companyId ??
+  jp?.companyID ??
+  jp?.company_ID ??
+  jp?.company_id ??
+  jp?.company?.companyId;
+
+const resolveJobPositionSemesterCompanyId = (jp) =>
+  jp?.semesterCompanyId ??
+  jp?.semesterCompanyID ??
+  jp?.semesterCompanyid;
+
+const resolveSemesterCompanyId = (sc) =>
+  sc?.semesterCompanyId ?? sc?.semesterCompanyID ?? sc?.id ?? sc?.Id;
+
+const resolveCompanyId = (sc) =>
+  sc?.companyId ??
+  sc?.companyID ??
+  sc?.company_ID ??
+  sc?.company?.companyId ??
+  sc?.company?.company_ID;
+
   // ===================== SUBMIT =====================
   const onFinish = async (values) => {
+    const companyId = getCompanyIdFromStorage();
+if (!companyId) {
+  notification.error({ message: "Không xác định được công ty" });
+  return;
+}
     try {
       if (!activeSemester) {
         notification.error({ message: "Chưa có học kỳ active" });
@@ -102,6 +266,7 @@ export default function CompanyCreateFinalReport() {
       formData.append("UserId", values.userId);
       formData.append("JobPositionId", values.jobPositionId);
       formData.append("SemesterId", activeSemester.semesterId); // 🔥 gửi ID
+      formData.append("CompanyId", companyId); // 🔥🔥🔥 BẮT BUỘC
       formData.append("CompanyFeedback", values.companyFeedback);
       formData.append("CompanyRating", values.companyRating);
       formData.append("CompanyEvaluator", values.companyEvaluator);
@@ -131,6 +296,8 @@ export default function CompanyCreateFinalReport() {
           "Lỗi không xác định",
       });
     }
+    await fetchData();
+
   };
 
   // ===================== RENDER =====================
@@ -146,36 +313,45 @@ export default function CompanyCreateFinalReport() {
         >
           {/* ===== STUDENT (roleId = 3) ===== */}
           <Form.Item
-            label="Sinh viên"
-            name="userId"
-            rules={[{ required: true, message: "Chọn sinh viên" }]}
-          >
-            <Select placeholder="Chọn sinh viên">
-              {students.map((u) => (
-                <Option key={u.userId} value={u.userId}>
-                  {u.fullname}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
+  label="Sinh viên"
+  name="userId"
+  rules={[{ required: true, message: "Chọn sinh viên" }]}
+>
+  <Select
+    placeholder="Chọn sinh viên"
+    onChange={handleStudentChange}
+  >
+    {students.map((u) => {
+      const uid = resolveUserId(u);
+      return (
+        <Option key={uid} value={uid}>
+          {u.fullname}
+        </Option>
+      );
+    })}
+  </Select>
+</Form.Item>
+
+
 
           {/* ===== JOB POSITION ===== */}
           <Form.Item
-            label="Vị trí thực tập"
-            name="jobPositionId"
-            rules={[{ required: true, message: "Chọn vị trí" }]}
-          >
-            <Select placeholder="Chọn vị trí thực tập">
-              {jobPositions.map((jp) => (
-                <Option
-                  key={jp.jobPositionId}
-                  value={jp.jobPositionId}
-                >
-                  {jp.jobTitle}
-                </Option>
-              ))}
-            </Select>
-          </Form.Item>
+  label="Vị trí thực tập"
+  name="jobPositionId"
+  rules={[{ required: true, message: "Chọn vị trí" }]}
+>
+  <Select disabled placeholder="Vị trí thực tập">
+    {jobPositions.map((jp) => {
+      const jpId = resolveJobPositionId(jp);
+      return (
+        <Option key={jpId} value={jpId}>
+          {jp.jobTitle}
+        </Option>
+      );
+    })}
+  </Select>
+</Form.Item>
+
 
           {/* ===== SEMESTER NAME (READ ONLY) ===== */}
           <Form.Item label="Học kỳ" name="semesterName">
