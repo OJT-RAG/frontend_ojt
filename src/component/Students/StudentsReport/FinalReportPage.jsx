@@ -2,12 +2,6 @@ import React, { useState, useEffect } from "react";
 import { Button, notification, Spin, Table, Tag } from "antd";
 import finalReportApi from "../../API/FinalReportAPI";
 
-import { Worker, Viewer } from "@react-pdf-viewer/core";
-import { defaultLayoutPlugin } from "@react-pdf-viewer/default-layout";
-
-import "@react-pdf-viewer/core/lib/styles/index.css";
-import "@react-pdf-viewer/default-layout/lib/styles/index.css";
-
 import "./FinalReport.css";
 
 const safeParseJson = (value, fallback) => {
@@ -25,13 +19,19 @@ const resolveUserId = () => {
     Number(authUser?.id ?? authUser?.userId ?? userInfo?.userId ?? 0) || 0
   );
 };
-
 const FinalReportPage = () => {
   const [loading, setLoading] = useState(false);
   const [reports, setReports] = useState([]);
   const [selectedReport, setSelectedReport] = useState(null);
+  
+  const getResultImage = () => {
+  if (!selectedReport || selectedReport.companyRating == null) return null;
 
-  const layoutPlugin = defaultLayoutPlugin();
+  return Number(selectedReport.companyRating) >= 3
+    ? "/pngtree-check-green-tick-sign-symbol-png-image_7586711.png"
+    : "/png-clipart-symbole-de-coche-marque-x-cordons-elastiques-logo-rouge-aile-ligne-bec-thumbnail.png";
+};
+
   useEffect(() => {
     let cancelled = false;
 
@@ -82,34 +82,75 @@ const FinalReportPage = () => {
   };
 
   const columns = [
-    { title: "Job Position ID", dataIndex: "jobPositionId", key: "jobPositionId", width: 130 },
-    { title: "Semester ID", dataIndex: "semesterId", key: "semesterId", width: 110 },
-    {
-      title: "File",
-      dataIndex: "studentReportFile",
-      key: "studentReportFile",
-      render: (file) =>
-        file ? (
-          <a href={file} target="_blank" rel="noreferrer">Xem PDF</a>
-        ) : (
-          <span style={{ color: "#999" }}>Không có</span>
-        ),
-    },
-    {
-      title: "Final",
-      dataIndex: "companyRating",
-      key: "companyRating",
-      width: 90,
-      render: (score) => statusTag(score),
-    },
-    {
-      title: "Ngày nộp",
-      dataIndex: "submittedAt",
-      key: "submittedAt",
-      width: 170,
-      render: (d) => (d ? new Date(d).toLocaleString() : "-"),
-    },
-  ];
+  {
+    title: "Job Position",
+    dataIndex: "jobPositionId",
+    key: "jobPositionId",
+    width: 120,
+  },
+  {
+    title: "Semester",
+    dataIndex: "semesterId",
+    key: "semesterId",
+    width: 100,
+  },
+
+  // ⬅️ ĐẨY FILE SANG TRÁI + THU NHỎ
+  {
+    title: "File",
+    dataIndex: "studentReportFile",
+    key: "studentReportFile",
+    width: 90,
+    align: "center",
+    render: (file) =>
+      file ? (
+        <a href={file} target="_blank" rel="noreferrer">
+          PDF
+        </a>
+      ) : (
+        <span style={{ color: "#999" }}>-</span>
+      ),
+  },
+
+  // ⬅️ FINAL GỌN LẠI
+  {
+    title: "Final",
+    dataIndex: "companyRating",
+    key: "companyRating",
+    width: 80,
+    align: "center",
+    render: (score) => statusTag(score),
+  },
+
+  // ⭐ NHẬN XÉT ĂN KHÔNG GIAN
+  {
+    title: "Nhận xét",
+    dataIndex: "companyFeedback",
+    key: "companyFeedback",
+    ellipsis: true,
+    render: (text) =>
+      text ? text : <span style={{ color: "#999" }}>-</span>,
+  },
+
+  {
+    title: "Người chấm",
+    dataIndex: "companyEvaluator",
+    key: "companyEvaluator",
+    width: 160,
+    render: (text) =>
+      text ? text : <span style={{ color: "#999" }}>-</span>,
+  },
+
+  {
+    title: "Ngày nộp",
+    dataIndex: "submittedAt",
+    key: "submittedAt",
+    width: 160,
+    render: (d) => (d ? new Date(d).toLocaleString() : "-"),
+  },
+];
+
+
 
   return (
     <div className="final-report-wrapper">
@@ -143,47 +184,57 @@ const FinalReportPage = () => {
             </div>
 
             <Table
-              rowKey={(r) => r?.finalreportId ?? r?.finalReportId ?? r?.id ?? `${r?.userId}-${r?.jobPositionId}-${r?.semesterId}`}
-              columns={columns}
-              dataSource={reports}
-              pagination={{ pageSize: 6 }}
-              onRow={(record) => ({
-                onClick: () => setSelectedReport(record),
-              })}
-              rowClassName={(record) => {
-                const selectedKey = selectedReport?.finalreportId ?? selectedReport?.finalReportId ?? selectedReport?.id;
-                const recordKey = record?.finalreportId ?? record?.finalReportId ?? record?.id;
-                return selectedKey != null && recordKey === selectedKey ? "is-selected" : "";
-              }}
-            />
-
-            {selectedReport && (
-              <div style={{ marginTop: 12 }}>
-                <div style={{ fontWeight: 700, marginBottom: 6 }}>Chi tiết</div>
-                <div><strong>Nhận xét:</strong> {selectedReport.companyFeedback || "-"}</div>
-                <div><strong>Người chấm:</strong> {selectedReport.companyEvaluator || "-"}</div>
-              </div>
-            )}
+  rowKey={(r) =>
+    r?.finalreportId ??
+    r?.finalReportId ??
+    r?.id ??
+    `${r?.userId}-${r?.jobPositionId}-${r?.semesterId}`
+  }
+  columns={columns}
+  dataSource={reports}
+  pagination={false}   // 🔥 BỎ PAGINATION
+  onRow={(record) => ({
+    onClick: () => setSelectedReport(record),
+  })}
+  rowClassName={(record) => {
+    const selectedKey =
+      selectedReport?.finalreportId ??
+      selectedReport?.finalReportId ??
+      selectedReport?.id;
+    const recordKey =
+      record?.finalreportId ??
+      record?.finalReportId ??
+      record?.id;
+    return selectedKey != null && recordKey === selectedKey
+      ? "is-selected"
+      : "";
+  }}
+/>
           </Spin>
         </div>
-
-        <div className="right-panel">
-          {selectedReport?.studentReportFile ? (
-            <div className="pdf-viewer">
-              <Worker workerUrl="https://unpkg.com/pdfjs-dist@3.11.174/build/pdf.worker.min.js">
-                <Viewer
-                  key={selectedReport.studentReportFile}
-                  fileUrl={selectedReport.studentReportFile}
-                  plugins={[layoutPlugin]}
-                />
-              </Worker>
-            </div>
-          ) : (
-            <div className="empty-viewer">Chưa có báo cáo PDF</div>
-          )}
-        </div>
       </div>
+      {/* 🎯 HÌNH KẾT QUẢ */}
+{selectedReport && selectedReport.companyRating != null && (
+  <div style={{ marginTop: 24, textAlign: "center" }}>
+    <img
+      src={getResultImage()}
+      alt="Kết quả đánh giá"
+      style={{
+        maxWidth: 260,
+        width: "100%",
+        
+      }}
+    />
+    <div style={{ marginTop: 8, fontWeight: 600 }}>
+      {Number(selectedReport.companyRating) >= 3
+        ? "Đạt yêu cầu"
+        : "Không đạt yêu cầu"}
     </div>
+  </div>
+)}
+    </div>
+    
+
   );
 };
 

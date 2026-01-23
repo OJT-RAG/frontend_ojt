@@ -2,6 +2,8 @@ import React, { useEffect, useState } from "react";
 import jobApplicationApi from "../../API/JobApplicationAPI";
 import jobPositionApi from "../../API/JobPositionAPI";
 import companySemesterApi from "../../API/CompanySemesterAPI";
+import userApi from "../../API/UserAPI";
+
 import "./JobApplicationManage.scss";
 
 const isDebugEnabled = () => {
@@ -132,18 +134,36 @@ export default function JobApplicationManage() {
 
   // Toggle Pending <-> Accepted
   const handleToggleStatus = async (app) => {
-    const newStatus = app.status === "accepted" ? "pending" : "accepted";
+  const companyId = getCompanyIdFromStorage();
+  if (!companyId) {
+    alert("Không tìm thấy companyId");
+    return;
+  }
 
-    try {
-      await jobApplicationApi.updateStatus({
-        jobApplicationId: app.jobApplicationId,
-        status: newStatus,
+  const newStatus = app.status === "accepted" ? "pending" : "accepted";
+
+  try {
+    // 1️⃣ Update trạng thái application
+    await jobApplicationApi.updateStatus({
+      jobApplicationId: app.jobApplicationId,
+      status: newStatus,
+    });
+
+    // 2️⃣ Nếu ACCEPT → update CompanyId cho student
+    if (newStatus === "accepted") {
+      await userApi.updateStudentCompany({
+        userId: app.userId,
+        companyId: companyId,
       });
-      fetchApplications();
-    } catch (err) {
-      console.error("Update status failed", err);
     }
-  };
+
+    fetchApplications();
+  } catch (err) {
+    console.error("Update status failed", err);
+    alert("Có lỗi xảy ra khi cập nhật");
+  }
+};
+
 
   // Reject application
   const handleReject = async (appId) => {

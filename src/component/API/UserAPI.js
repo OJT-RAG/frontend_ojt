@@ -23,6 +23,14 @@ const userApi = {
     if (semesterId != null) fd.append("SemesterId", String(semesterId));
     return httpClient.put("/user/update", fd);
   },
+  updateStudentCompany: ({ userId, companyId }) => {
+  const fd = new FormData();
+  fd.append("UserId", String(userId));
+  fd.append("CompanyId", String(companyId));
+
+  return httpClient.put("/user/update", fd);
+},
+
 
   // Not listed in the provided spec, but kept for compatibility.
   create: (data) => httpClient.post("/user/create", data),

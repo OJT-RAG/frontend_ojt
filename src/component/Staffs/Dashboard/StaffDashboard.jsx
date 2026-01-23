@@ -1,99 +1,68 @@
-import React, { useEffect, useRef, useState } from "react";
-import userChatApi from "../../API/UserChatAPI";
+import React, { useEffect, useState } from "react";
+import majorApi from "../../API/MajorAPI";
+import companyApi from "../../API/CompanyAPI";
+import ojtDocumentApi from "../../API/OjtDocumentAPI";
+import CompanySemesterPie from "./CompanySemesterPie";
+import "./StaffDashboard.css";
 
-const POLL_INTERVAL = 2000;
-
-export default function ChatContent({ staffId, session }) {
-  const [messages, setMessages] = useState([]);
-  const [input, setInput] = useState("");
-  const bottomRef = useRef(null);
-  const prevCountRef = useRef(0);
+export default function StaffDashboard() {
+  const [totalMajor, setTotalMajor] = useState(0);
+  const [totalCompany, setTotalCompany] = useState(0);
+  const [totalDocument, setTotalDocument] = useState(0);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    if (!session) return;
+    fetchDashboardData();
+  }, []);
 
-    loadConversation();
+  const fetchDashboardData = async () => {
+  try {
+    setLoading(true);
 
-    const timer = setInterval(loadConversation, POLL_INTERVAL);
-    return () => clearInterval(timer);
-  }, [session]);
+    const [majorRes, companyRes, documentRes] = await Promise.all([
+      majorApi.getAll(),
+      companyApi.getAll(),
+      ojtDocumentApi.getAll(),
+    ]);
 
-  const loadConversation = async () => {
-    try {
-      const res = await userChatApi.getConversation(
-        staffId,
-        session.studentId
-      );
-
-      const data = Array.isArray(res.data)
-        ? res.data
-        : res.data?.data || [];
-
-      setMessages(data);
-    } catch (err) {
-      console.error("Load conversation failed", err);
-    }
-  };
-
-  const sendMessage = async () => {
-    if (!input.trim()) return;
-
-    await userChatApi.sendMessage({
-      senderId: staffId,
-      receiverId: session.studentId,
-      content: input,
-    });
-
-    setInput("");
-    await loadConversation();
-  };
-
- useEffect(() => {
-  if (messages.length > prevCountRef.current) {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
+    setTotalMajor(majorRes?.data?.data?.length || 0);
+    setTotalCompany(companyRes?.data?.data?.length || 0);
+    setTotalDocument(documentRes?.data?.data?.length || 0);
+  } catch (error) {
+    console.error("❌ Error loading dashboard data:", error?.response || error);
+  } finally {
+    setLoading(false);
   }
-  prevCountRef.current = messages.length;
-}, [messages]);
+};
 
-  if (!session) {
-    return (
-      <div className="chat-content empty">
-        Chọn một session để bắt đầu chat
-      </div>
-    );
+
+
+  if (loading) {
+    return <div className="staff-dashboard loading">Loading dashboard...</div>;
   }
 
   return (
-    <div className="chat-content">
-      <div className="chat-header">
-        {session.studentName}
+    <div className="staff-dashboard">
+      <h2 className="dashboard-title">Staff Dashboard</h2>
+
+      <div className="dashboard-cards">
+        <div className="dashboard-card major">
+          <div className="card-title">Total Majors</div>
+          <div className="card-value">{totalMajor}</div>
+        </div>
+
+        <div className="dashboard-card company">
+          <div className="card-title">Total Companies</div>
+          <div className="card-value">{totalCompany}</div>
+        </div>
+
+        <div className="dashboard-card document">
+          <div className="card-title">Total Documents</div>
+          <div className="card-value">{totalDocument}</div>
+        </div>
       </div>
 
-      <div className="chat-messages">
-        {messages.map((m, i) => (
-          <div
-            key={i}
-            className={`chat-message ${
-              m.senderId === staffId ? "me" : ""
-            }`}
-          >
-            {m.content}
-          </div>
-        ))}
-        <div ref={bottomRef} />
-      </div>
-
-      <div className="chat-input">
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          placeholder="Nhập tin nhắn..."
-          onKeyDown={(e) =>
-            e.key === "Enter" && sendMessage()
-          }
-        />
-        <button onClick={sendMessage}>Gửi</button>
-      </div>
+      <CompanySemesterPie />
     </div>
   );
 }
