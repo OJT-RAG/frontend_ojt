@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./DocumentManager.scss";
 import ojtDocumentApi from "../../API/OjtDocumentAPI";
 import semesterApi from "../../API/SemesterAPI";
@@ -41,6 +41,10 @@ const DocumentManager = () => {
 
   const [filter, setFilter] = useState("all"); // all | general | semester
   const [search, setSearch] = useState("");
+
+  const tableWrapperRef = useRef(null);
+  const [pageSize, setPageSize] = useState(8);
+  const [page, setPage] = useState(1);
 
   const [uploadOpen, setUploadOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -653,10 +657,64 @@ const DocumentManager = () => {
   }, [documents, filter, search]);
 
   useEffect(() => {
+    setPage(1);
+  }, [filter, search]);
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredDocuments.length / Math.max(1, pageSize))),
+    [filteredDocuments.length, pageSize]
+  );
+
+  useEffect(() => {
+    setPage((p) => Math.min(Math.max(1, p), totalPages));
+  }, [totalPages]);
+
+  const pagedDocuments = useMemo(() => {
+    const safeSize = Math.max(1, pageSize);
+    const start = (page - 1) * safeSize;
+    return filteredDocuments.slice(start, start + safeSize);
+  }, [filteredDocuments, page, pageSize]);
+
+  const recomputePageSize = useCallback(() => {
+    const wrapper = tableWrapperRef.current;
+    if (!wrapper) return;
+
+    const wrapperHeight = wrapper.getBoundingClientRect().height || 0;
+    if (wrapperHeight <= 0) return;
+
+    const headerEl = wrapper.querySelector("thead");
+    const firstRowEl = wrapper.querySelector("tbody tr");
+
+    const headerHeight = headerEl?.getBoundingClientRect().height || 44;
+    const rowHeight = firstRowEl?.getBoundingClientRect().height || 56;
+
+    // Small safety padding for borders/margins.
+    const available = Math.max(0, wrapperHeight - headerHeight - 16);
+    const nextSize = Math.max(4, Math.floor(available / Math.max(1, rowHeight)));
+
+    setPageSize((prev) => (prev === nextSize ? prev : nextSize));
+  }, []);
+
+  useEffect(() => {
+    recomputePageSize();
+    const wrapper = tableWrapperRef.current;
+
+    let ro = null;
+    if (typeof window !== "undefined" && "ResizeObserver" in window && wrapper) {
+      ro = new ResizeObserver(() => recomputePageSize());
+      ro.observe(wrapper);
+    }
+
+    window.addEventListener("resize", recomputePageSize);
+    return () => {
+      window.removeEventListener("resize", recomputePageSize);
+      if (ro) ro.disconnect();
+    };
+  }, [recomputePageSize]);
+
+  useEffect(() => {
     let cancelled = false;
-    const candidates = (filteredDocuments || [])
-      .map((doc) => getDocId(doc))
-      .filter(Boolean);
+    const candidates = (pagedDocuments || []).map((doc) => getDocId(doc)).filter(Boolean);
 
     const missing = candidates.filter((docId) => {
       const key = String(docId);
@@ -681,7 +739,7 @@ const DocumentManager = () => {
     return () => {
       cancelled = true;
     };
-  }, [filteredDocuments, tagsByDocId, tagsLoadingByDocId]);
+  }, [pagedDocuments, tagsByDocId, tagsLoadingByDocId]);
 
   return (
     <div className="admin-page document-manager">
@@ -777,7 +835,7 @@ const DocumentManager = () => {
           </div>
         )}
 
-        <div className="dm-table-wrapper">
+        <div className="dm-table-wrapper" ref={tableWrapperRef}>
           <table className="admin-table dm-table">
             <thead>
               <tr>
@@ -804,7 +862,7 @@ const DocumentManager = () => {
                   <td colSpan={7}>No documents found.</td>
                 </tr>
               ) : (
-                filteredDocuments.map((doc, idx) => {
+                pagedDocuments.map((doc, idx) => {
                   const id = getDocId(doc);
                   const semesterId = doc?.semesterId;
                   const semesterName = semesterNameById.get(Number(semesterId)) || semesterId || "-";
@@ -907,6 +965,20 @@ const DocumentManager = () => {
             </tbody>
           </table>
         </div>
+
+        {totalPages > 1 && (
+          <div className="dm-pagination">
+            <button disabled={page === 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+              ← Prev
+            </button>
+            <span>
+              Page {page} / {totalPages}
+            </span>
+            <button disabled={page === totalPages} onClick={() => setPage((p) => Math.min(totalPages, p + 1))}>
+              Next →
+            </button>
+          </div>
+        )}
       </div>
 
       {uploadOpen && (

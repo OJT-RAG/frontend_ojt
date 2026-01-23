@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import "./DocumentManager.scss";
 import ojtDocumentApi from "../../API/OjtDocumentAPI";
 import semesterApi from "../../API/SemesterAPI";
@@ -41,7 +41,8 @@ const DocumentManager = () => {
 
   const [filter, setFilter] = useState("all"); // all | general | semester
   const [search, setSearch] = useState("");
-  const PAGE_SIZE = 4;
+  const tableWrapperRef = useRef(null);
+  const [pageSize, setPageSize] = useState(8);
   const [page, setPage] = useState(1);
 
   const [uploadOpen, setUploadOpen] = useState(false);
@@ -653,18 +654,61 @@ const DocumentManager = () => {
         return title.includes(q);
       });
   }, [documents, filter, search]);
-  useEffect(() => {
-  setPage(1);
-}, [filter, search]);
-const totalPages = Math.max(
-  1,
-  Math.ceil(filteredDocuments.length / PAGE_SIZE)
-);
 
-const pagedDocuments = useMemo(() => {
-  const start = (page - 1) * PAGE_SIZE;
-  return filteredDocuments.slice(start, start + PAGE_SIZE);
-}, [filteredDocuments, page]);
+  useEffect(() => {
+    setPage(1);
+  }, [filter, search]);
+
+  const totalPages = useMemo(
+    () => Math.max(1, Math.ceil(filteredDocuments.length / Math.max(1, pageSize))),
+    [filteredDocuments.length, pageSize]
+  );
+
+  useEffect(() => {
+    setPage((p) => Math.min(Math.max(1, p), totalPages));
+  }, [totalPages]);
+
+  const pagedDocuments = useMemo(() => {
+    const safeSize = Math.max(1, pageSize);
+    const start = (page - 1) * safeSize;
+    return filteredDocuments.slice(start, start + safeSize);
+  }, [filteredDocuments, page, pageSize]);
+
+  const recomputePageSize = useCallback(() => {
+    const wrapper = tableWrapperRef.current;
+    if (!wrapper) return;
+
+    const wrapperHeight = wrapper.getBoundingClientRect().height || 0;
+    if (wrapperHeight <= 0) return;
+
+    const headerEl = wrapper.querySelector("thead");
+    const firstRowEl = wrapper.querySelector("tbody tr");
+
+    const headerHeight = headerEl?.getBoundingClientRect().height || 44;
+    const rowHeight = firstRowEl?.getBoundingClientRect().height || 56;
+
+    const available = Math.max(0, wrapperHeight - headerHeight - 16);
+    const nextSize = Math.max(4, Math.floor(available / Math.max(1, rowHeight)));
+
+    setPageSize((prev) => (prev === nextSize ? prev : nextSize));
+  }, []);
+
+  useEffect(() => {
+    recomputePageSize();
+    const wrapper = tableWrapperRef.current;
+
+    let ro = null;
+    if (typeof window !== "undefined" && "ResizeObserver" in window && wrapper) {
+      ro = new ResizeObserver(() => recomputePageSize());
+      ro.observe(wrapper);
+    }
+
+    window.addEventListener("resize", recomputePageSize);
+    return () => {
+      window.removeEventListener("resize", recomputePageSize);
+      if (ro) ro.disconnect();
+    };
+  }, [recomputePageSize]);
 
   useEffect(() => {
     let cancelled = false;
@@ -789,7 +833,7 @@ const pagedDocuments = useMemo(() => {
             
           </div>
         )}
-      <div className="dm-table-wrapper">
+      <div className="dm-table-wrapper" ref={tableWrapperRef}>
         <table className="admin-table dm-table">
           <thead>
             <tr>

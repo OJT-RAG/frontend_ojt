@@ -335,4 +335,14 @@
     gap: 10px;
     margin-top: 4px;
   }
+
+  .dm-pagination {
+    flex-shrink: 0;
+    min-height: 44px;
+    padding-top: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    background: #fff;
+  }
 }
