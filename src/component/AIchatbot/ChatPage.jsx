@@ -12,6 +12,7 @@ import { useNavigate } from "react-router-dom";
 import chatRoomApi from "../API/chatRoomApi.js";
 import userApi from "../API/UserAPI.js";
 import userChatApi from "../API/UserChatAPI";
+import { useAuth } from "../Hook/useAuth.jsx";
 
 import { FileText, Paperclip, Sparkles } from "lucide-react";
 
@@ -170,10 +171,10 @@ const pickStaffRoundRobin = (staffList) => {
   return picked;
 };
 
-const loadStoredSessions = (translate) => {
+const loadStoredSessions = (translate, storageKey = LOCAL_STORAGE_KEY) => {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(LOCAL_STORAGE_KEY);
+    const raw = window.localStorage.getItem(storageKey);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed)) return [];
@@ -366,38 +367,34 @@ const fetchWithTimeout = async (url, options, timeoutMs = 60_000) => {
 const ChatPage = () => {
   const { t } = useI18n();
   const initialSessionsRef = useRef(null);
+  const lastStorageKeyRef = useRef(null);
   const cvInputRef = useRef(null);
   const navigate = useNavigate();
-  const currentUser = useMemo(() => {
-  for (let i = 0; i < localStorage.length; i++) {
-    try {
-      const parsed = JSON.parse(localStorage.getItem(localStorage.key(i)));
-      if (parsed?.id && parsed?.email) return parsed;
-    } catch {}
-  }
-  return null;
-}, []);
+  const { authUser, role: authRole } = useAuth();
 
-const currentUserId = currentUser
-  ? Number(currentUser.userId ?? currentUser.id)
-  : null;
+  const currentUser = authUser;
+  const currentUserId = currentUser
+    ? Number(currentUser.userId ?? currentUser.id)
+    : null;
 
   const currentUserRole = useMemo(() => {
-    const fromUser = typeof currentUser?.role === "string" ? currentUser.role : "";
-    if (fromUser) return fromUser.toLowerCase();
-    try {
-      return (localStorage.getItem("userRole") || "").toLowerCase();
-    } catch {
-      return "";
-    }
-  }, [currentUser]);
+    const fromContext = typeof authRole === "string" ? authRole.toLowerCase() : "";
+    const fromUser = typeof currentUser?.role === "string" ? currentUser.role.toLowerCase() : "";
+    return fromContext || fromUser || "";
+  }, [authRole, currentUser]);
+
+  const storageKey = useMemo(
+    () => `${LOCAL_STORAGE_KEY}:${currentUserId ?? "guest"}`,
+    [currentUserId]
+  );
 
   // Only students can chat with staff (admin/company must not).
   const canChatWithStaff = currentUserRole === "student";
 
   if (initialSessionsRef.current === null) {
-    const stored = loadStoredSessions(t);
+    const stored = loadStoredSessions(t, storageKey);
     initialSessionsRef.current = stored.length > 0 ? stored : [createLocalSession(t, 1)];
+    lastStorageKeyRef.current = storageKey;
   }
 
   const [sessions, setSessions] = useState(initialSessionsRef.current);
@@ -520,11 +517,23 @@ const currentUserId = currentUser
   useEffect(() => {
     if (typeof window === "undefined") return;
     try {
-      window.localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(sessions));
+      window.localStorage.setItem(storageKey, JSON.stringify(sessions));
     } catch (error) {
       console.warn("Unable to persist chat sessions", error);
     }
-  }, [sessions]);
+  }, [sessions, storageKey]);
+
+  useEffect(() => {
+    if (!storageKey) return;
+    if (lastStorageKeyRef.current === storageKey) return;
+
+    const stored = loadStoredSessions(t, storageKey);
+    const nextSessions = stored.length > 0 ? stored : [createLocalSession(t, 1)];
+
+    lastStorageKeyRef.current = storageKey;
+    setSessions(nextSessions);
+    setActiveSessionId(nextSessions[0]?.id || null);
+  }, [storageKey, t]);
 
   useEffect(() => {
     let isMounted = true;

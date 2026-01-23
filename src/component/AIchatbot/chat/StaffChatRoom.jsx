@@ -2,51 +2,18 @@ import React, { useEffect, useRef, useState, useCallback } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import userChatApi from "../../API/UserChatAPI.js";
 import userApi from "../../API/UserAPI";
+import { useAuth } from "../../Hook/useAuth.jsx";
 
 import "./StaffChatRoom.scss";
 
 const POLL_INTERVAL = 3000; // Fallback polling every 3 seconds
 
-/**
- * 🔍 Try to find logged-in user from ANY localStorage key
- */
-const findUserFromLocalStorage = () => {
-  console.group("🔍 Scan localStorage");
-
-  for (let i = 0; i < localStorage.length; i++) {
-    const key = localStorage.key(i);
-    const raw = localStorage.getItem(key);
-
-    try {
-      const parsed = JSON.parse(raw);
-
-      if (
-        parsed &&
-        typeof parsed === "object" &&
-        parsed.id &&
-        parsed.email &&
-        parsed.role
-      ) {
-        console.log("✅ Found user at key:", key, parsed);
-        console.groupEnd();
-        return parsed;
-      }
-    } catch {
-      // ignore non-json
-    }
-  }
-
-  console.warn("❌ No valid user object found in localStorage");
-  console.groupEnd();
-  return null;
-};
-
 const StaffChatRoom = () => {
   const { staffId } = useParams();
   const navigate = useNavigate();
   const [otherUser, setOtherUser] = useState(null);
-  const user = findUserFromLocalStorage();
-  const currentUserId = user ? Number(user.id) : null;
+  const { authUser } = useAuth();
+  const currentUserId = authUser ? Number(authUser.userId ?? authUser.id) : null;
 
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
