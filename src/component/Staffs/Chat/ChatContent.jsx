@@ -48,18 +48,6 @@ export default function ChatContent({ staffId, session }) {
     await loadConversation();
   };
 
-useEffect(() => {
-  if (messages.length === 0) return;
-
-  const lastMessage = messages[messages.length - 1];
-
-  // ✅ CHỈ auto-scroll nếu tin nhắn cuối KHÔNG phải của mình
-  if (lastMessage.senderId !== staffId) {
-    bottomRef.current?.scrollIntoView({ behavior: "smooth" });
-  }
-
-  prevCountRef.current = messages.length;
-}, [messages, staffId]);
 
 
   if (!session) {
