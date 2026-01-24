@@ -7,6 +7,7 @@ import { useI18n } from '../../i18n/i18n.jsx';
 import userApi from '../API/UserAPI.js';
 import { pickAvatarUrl } from '../lib/utils.jsx';
 import semesterApi from '../API/SemesterAPI.js';
+import majorApi from '../API/MajorAPI.js';
 
 function CV({ student, onEditProfile }) {
   const navigate = useNavigate();
@@ -32,6 +33,8 @@ function CV({ student, onEditProfile }) {
 
   const [profile, setProfile] = useState(null);
   const [activeSemesterName, setActiveSemesterName] = useState('');
+  const [majorTitle, setMajorTitle] = useState('');
+  const majorTitleCacheRef = useRef(new Map());
 
   useEffect(() => {
     let cancelled = false;
@@ -99,6 +102,45 @@ function CV({ student, onEditProfile }) {
     };
   }, [student]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadMajorTitle = async () => {
+      const majorId = Number(profile?.majorId) || 0;
+      if (!majorId) {
+        setMajorTitle('');
+        return;
+      }
+
+      if (profile?.majorTitle) {
+        setMajorTitle(profile.majorTitle);
+        return;
+      }
+
+      const cached = majorTitleCacheRef.current.get(majorId);
+      if (cached) {
+        setMajorTitle(cached);
+        return;
+      }
+
+      try {
+        const res = await majorApi.getById(majorId);
+        const m = res?.data?.data ?? res?.data ?? null;
+        const title = m?.majorTitle || '';
+        if (cancelled) return;
+        if (title) majorTitleCacheRef.current.set(majorId, title);
+        setMajorTitle(title);
+      } catch {
+        if (!cancelled) setMajorTitle('');
+      }
+    };
+
+    loadMajorTitle();
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.majorId, profile?.majorTitle]);
+
   const data = useMemo(() => {
     // If parent passes legacy shape (already in CV format), accept it.
     if (profile && (profile.name || profile.studentNumber)) {
@@ -117,6 +159,7 @@ function CV({ student, onEditProfile }) {
 
     // Map API user shape -> CV view model.
     const majorText =
+      majorTitle ||
       profile?.majorTitle ||
       profile?.majorName ||
       (profile?.majorId != null ? String(profile.majorId) : '-');
@@ -132,7 +175,7 @@ function CV({ student, onEditProfile }) {
       cvUrl: profile?.cvUrl || profile?.cvurl || profile?.cvURL || '-',
       avatarUrl: pickAvatarUrl(profile) || null,
     };
-  }, [profile, activeSemesterName]);
+  }, [profile, activeSemesterName, majorTitle]);
 
   const [avatarBroken, setAvatarBroken] = useState(false);
   useEffect(() => {
