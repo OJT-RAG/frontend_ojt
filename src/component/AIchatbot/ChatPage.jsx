@@ -19,6 +19,7 @@ import { FileText, Paperclip, Sparkles } from "lucide-react";
 const LOCAL_STORAGE_KEY = "ojt-rag-chat-sessions";
 const DEFAULT_RAG_BASE = "https://trongnhan312-ojt-rag-bot.hf.space";
 const STAFF_FIXED_KEY = "fixed_staff_for_student";
+const MAX_AI_SESSIONS = 3;
 
 const sanitizeBaseUrl = (value) => {
   if (!value || typeof value !== "string") return "";
@@ -135,6 +136,8 @@ const normalizeSession = (session, translate, indexFallback = 1) => {
 
   return {
     id: String(session.id || session.sessionId || `local-${Math.random().toString(36).slice(2, 10)}`),
+    index,
+    staffName: typeof session.staffName === "string" ? session.staffName : undefined,
     title:
       typeof session.title === "string" && session.title.trim().length > 0
         ? session.title.trim()
@@ -167,6 +170,7 @@ const createLocalSession = (translate, index = 1) => {
   const createdAt = nowIso();
   return {
     id: `local-${createdAt}-${Math.random().toString(36).slice(2, 8)}`,
+    index,
     title: getSessionTitle(translate, index),
     createdAt,
     updatedAt: createdAt,
@@ -225,14 +229,17 @@ const prepareHistorySessions = (payload, translate) => {
   const ensureSession = (identifier) => {
     const key = identifier ? String(identifier) : `remote-${sessionMap.size + 1}`;
     if (!sessionMap.has(key)) {
+      const index = sessionMap.size + 1;
       sessionMap.set(key, {
         id: key,
         remoteId: key,
         origin: "remote",
+        type: "ai",
+        index,
         messages: [],
         createdAt: nowIso(),
         updatedAt: nowIso(),
-        title: getSessionTitle(translate, sessionMap.size + 1),
+        title: getSessionTitle(translate, index),
       });
     }
     return sessionMap.get(key);
@@ -430,7 +437,8 @@ const ChatPage = () => {
     id: `staff-${staffUserId}`,
     remoteId: `staff-${staffUserId}`,
     staffId: staffUserId,          // 🔥 QUAN TRỌNG
-    title: `Chat with ${staff.fullname || staff.email}`,
+    staffName: staff?.fullname || staff?.email || "CRO Staff",
+    title: "Chat With CRO Staff",
     type: "staff",
     origin: "staff",
     messages: [],
@@ -594,6 +602,21 @@ const ChatPage = () => {
   () => sessions.some(s => s.type === "staff"),
   [sessions]
 );
+
+  const staffHeaderName = useMemo(() => {
+    if (!isStaffSession) return "";
+
+    const staffName =
+      (typeof activeSession?.staffName === "string" && activeSession.staffName.trim()) ||
+      "";
+    if (staffName) return staffName;
+
+    const title = typeof activeSession?.title === "string" ? activeSession.title : "";
+    const match = title.match(/chat\s*with\s*(.+)$/i);
+    if (match?.[1]) return match[1].trim();
+
+    return "CRO Staff";
+  }, [activeSession, isStaffSession]);
   useEffect(() => {
     if (!activeSessionId && sessions.length > 0) {
       setActiveSessionId(sessions[0].id);
@@ -648,12 +671,32 @@ useEffect(() => {
   setSessions(prev => [session, ...prev]);
   setActiveSessionId(session.id);
 }, [staffList, currentUserId, canChatWithStaff]);
-  const handleCreateSession = () => {
+  const handleCreateSession = useCallback(() => {
     setLastError("");
-    const nextSession = createLocalSession(t, sessions.length + 1);
-    setSessions((prev) => [nextSession, ...prev]);
-    setActiveSessionId(nextSession.id);
-  };
+
+    setSessions((prev) => {
+      const aiSessions = prev.filter((session) => session?.type !== "staff");
+      if (aiSessions.length >= MAX_AI_SESSIONS) {
+        const message =
+          (typeof t === "function" && t("chat_max_sessions_reached")) ||
+          `Maximum ${MAX_AI_SESSIONS} sessions reached.`;
+        setLastError(message);
+        return prev;
+      }
+
+      const maxIndex = aiSessions.reduce((acc, session) => {
+        const value = Number(session?.index);
+        return Number.isFinite(value) && value > acc ? value : acc;
+      }, 0);
+
+      const nextIndex =
+        maxIndex > 0 ? maxIndex + 1 : aiSessions.length > 0 ? aiSessions.length + 1 : 1;
+      const nextSession = createLocalSession(t, nextIndex);
+
+      setActiveSessionId(nextSession.id);
+      return [nextSession, ...prev];
+    });
+  }, [t]);
 
   const resolveRemoteSessionId = (session) => {
     const raw = session?.remoteId ?? session?.id;
@@ -1120,7 +1163,11 @@ const sendStaffMessage = async (session) => {
       <div className="chatpage-shell">
         <aside className="chatpage-sidebar" aria-label="Chat sessions">
           <div className="sidebar-header">
-            <button className="new-session-btn" onClick={handleCreateSession} type="button">
+            <button
+              className="new-session-btn"
+              onClick={handleCreateSession}
+              type="button"
+            >
               {t("chat_new_session")}
             </button>
             {canChatWithStaff && (
@@ -1144,25 +1191,39 @@ const sendStaffMessage = async (session) => {
     setActiveSessionId(session.id);
   }}
 >
-  {hasStaffSession ? "Staff chat already created" : "Chat with staff"}
+  {hasStaffSession ? "Staff chat already created" : "Chat With CRO Staff"}
 </button>
             )}
           </div>
           <div className="session-list">
-            {visibleSessions.map((session, index) => {
-              const displayTitle =
-  session.type === "staff"
-    ? session.title
-    : session.origin === "local"
-    ? getSessionTitle(t, index + 1)
-    : session.title || getSessionTitle(t, index + 1);
+            {(() => {
+              let aiPosition = 0;
 
-              return (
-                <div key={session.id} className="session-row">
+              return visibleSessions.map((session) => {
+                const isStaff = session?.type === "staff";
+                if (!isStaff) {
+                  aiPosition += 1;
+                }
+
+                const displayIndexRaw = Number(session?.index);
+                const displayIndex = Number.isFinite(displayIndexRaw) && displayIndexRaw > 0
+                  ? displayIndexRaw
+                  : aiPosition;
+
+                const defaultAiTitle = getSessionTitle(t, displayIndex);
+                const displayTitle = isStaff
+                  ? "Chat With CRO Staff"
+                  : session.origin === "remote"
+                  ? session.title || defaultAiTitle
+                  : defaultAiTitle;
+
+                return (
+                  <div key={session.id} className="session-row">
                   <button
                     type="button"
                     className={cn(
                       "session-item",
+                      isStaff && "staff-session",
                       session.id === activeSessionId && "active",
                       session.origin === "remote" && "session-remote"
                     )}
@@ -1175,24 +1236,27 @@ const sendStaffMessage = async (session) => {
                     <span className="session-meta">{session.messages.length}</span>
                   </button>
 
-                  <button
-                    type="button"
-                    className="session-delete"
-                    onClick={() => handleDeleteSession(session)}
-                  >
-                    Delete
-                  </button>
+                  {!isStaff && (
+                    <button
+                      type="button"
+                      className="session-delete"
+                      onClick={() => handleDeleteSession(session)}
+                    >
+                      Delete
+                    </button>
+                  )}
                 </div>
-              );
-            })}
+                );
+              });
+            })()}
           </div>
         </aside>
 
         <main className="chatpage-main">
           <header className="chatpage-main-header">
             <div className="chatpage-main-heading">
-              <h1>{t("chat_ask_anything")}</h1>
-              <p>{t("chat_sub")}</p>
+              <h1>{isStaffSession ? staffHeaderName : t("chat_ask_anything")}</h1>
+              <p>{isStaffSession ? "" : t("chat_sub")}</p>
             </div>
           </header>
 

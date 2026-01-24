@@ -224,6 +224,8 @@
   justify-content: space-between;
   align-items: center;
   padding: 12px;
+  flex: 1;
+  min-width: 0;
   border-radius: 14px;
   border: 1px solid transparent;
   background: rgba(255, 255, 255, 0.85);
@@ -250,6 +252,8 @@
 
 .session-delete {
   flex: 0 0 auto;
+  min-width: 88px;
+  text-align: center;
   padding: 10px 12px;
   border-radius: 12px;
   border: 1px solid rgba(226, 232, 240, 0.9);
@@ -270,6 +274,15 @@
   flex: 1;
   font-weight: 600;
   color: #1f2937;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.session-item.staff-session .session-title {
+  overflow: visible;
+  text-overflow: unset;
+  white-space: normal;
 }
 
 .session-meta {
