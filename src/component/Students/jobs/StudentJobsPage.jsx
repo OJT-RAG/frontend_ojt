@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { Button, Input, Table, Tag, message } from "antd";
+import { Button, Descriptions, Input, Modal, Table, Tag, message } from "antd";
 import { Bookmark, BookmarkCheck, RefreshCcw, Search } from "lucide-react";
 import jobPositionApi from "../../API/JobPositionAPI";
 import jobDescriptionApi from "../../API/JobDescriptionAPI";
@@ -7,6 +7,8 @@ import majorApi from "../../API/MajorAPI";
 import semesterApi from "../../API/SemesterAPI";
 import jobApplicationApi from "../../API/JobApplicationAPI";
 import jobBookmarkApi from "../../API/JobBookmarkAPI";
+import companyApi from "../../API/CompanyAPI";
+import companySemesterApi from "../../API/CompanySemesterAPI";
 
 import "./StudentJobsPage.css";
 
@@ -33,6 +35,17 @@ const resolveAuthContext = () => {
   return { userId, authUser };
 };
 
+const resolveJobDescriptionText = (item) => {
+  if (!item) return "";
+  return (
+    item?.jobDescription ??
+    item?.jobDescription1 ??
+    item?.description ??
+    item?.jobDesc ??
+    ""
+  );
+};
+
 
 export default function StudentJobsPage() {
   const [messageApi, contextHolder] = message.useMessage();
@@ -44,6 +57,14 @@ export default function StudentJobsPage() {
   const [majors, setMajors] = useState([]);
   const [semesters, setSemesters] = useState([]);
   const [descriptionsByJobPositionId, setDescriptionsByJobPositionId] = useState({});
+
+  const [companies, setCompanies] = useState([]);
+  const [semesterCompanies, setSemesterCompanies] = useState([]);
+
+  const [isDescViewOpen, setIsDescViewOpen] = useState(false);
+  const [descViewJob, setDescViewJob] = useState(null);
+  const [descViewRecord, setDescViewRecord] = useState(null);
+  const [descViewLoading, setDescViewLoading] = useState(false);
 
   const [applyingId, setApplyingId] = useState(null);
 
@@ -112,23 +133,27 @@ export default function StudentJobsPage() {
     try {
       setLoading(true);
 
-      const [posRes, majorRes, semesterRes, descRes] = await Promise.all([
+      const [posRes, majorRes, semesterRes, descRes, companyRes, semesterCompanyRes] = await Promise.all([
         jobPositionApi.getAll(),
         majorApi.getAll(),
         semesterApi.getAll(),
         jobDescriptionApi.getAll(),
+        companyApi.getAll(),
+        companySemesterApi.getAll(),
       ]);
 
       const list = posRes?.data?.data || [];
       setRows(list);
       setMajors(majorRes?.data?.data || []);
       setSemesters(semesterRes?.data?.data || []);
+      setCompanies(companyRes?.data?.data || []);
+      setSemesterCompanies(semesterCompanyRes?.data?.data || []);
 
       const descList = descRes?.data?.data || [];
       const map = {};
       for (const item of descList) {
         const jobPositionId = item.jobPositionId ?? item.jobPositionID ?? item.jobPositionid;
-        const text = item.jobDescription ?? item.description ?? item.jobDesc ?? "";
+        const text = resolveJobDescriptionText(item);
         if (jobPositionId != null) map[jobPositionId] = { ...item, _text: text };
       }
       setDescriptionsByJobPositionId(map);
@@ -174,6 +199,81 @@ export default function StudentJobsPage() {
     for (const s of semesters) map[s.semesterId] = s.name;
     return map;
   }, [semesters]);
+
+  const companyNameById = useMemo(() => {
+    const map = new Map();
+    for (const c of companies) {
+      const id = c?.companyId ?? c?.companyID ?? c?.company_ID ?? c?.id ?? c?.Id;
+      if (id != null) map.set(id, c?.companyName ?? c?.name ?? c?.fullName ?? "-");
+    }
+    return map;
+  }, [companies]);
+
+  const semesterCompanyCompanyIdByScId = useMemo(() => {
+    const map = new Map();
+    for (const sc of semesterCompanies) {
+      const scId = sc?.semesterCompanyId ?? sc?.semesterCompanyID ?? sc?.semesterCompanyid ?? sc?.id;
+      const companyId = sc?.companyId ?? sc?.companyID ?? sc?.company_ID ?? sc?.company_id ?? sc?.company?.companyId;
+      if (scId != null && companyId != null) map.set(scId, companyId);
+    }
+    return map;
+  }, [semesterCompanies]);
+
+  const resolveJobPositionSemesterCompanyId = (jp) =>
+    jp?.semesterCompanyId ?? jp?.semesterCompanyID ?? jp?.semesterCompanyid;
+
+  const resolveJobPositionCompanyId = (jp) =>
+    jp?.companyId ?? jp?.companyID ?? jp?.company_ID ?? jp?.company_id ?? jp?.company?.companyId;
+
+  const getCompanyNameForJob = (jp) => {
+    const directCompanyId = resolveJobPositionCompanyId(jp);
+    if (directCompanyId != null) return companyNameById.get(directCompanyId) || "-";
+
+    const scId = resolveJobPositionSemesterCompanyId(jp);
+    if (scId != null) {
+      const mappedCompanyId = semesterCompanyCompanyIdByScId.get(scId);
+      return companyNameById.get(mappedCompanyId) || "-";
+    }
+
+    return "-";
+  };
+
+  const openDescriptionViewModal = async (record) => {
+    const jobPositionId = record?.jobPositionId;
+    if (!jobPositionId) {
+      messageApi.warning("Missing Job Position ID");
+      return;
+    }
+
+    setIsDescViewOpen(true);
+    setDescViewJob(record);
+    setDescViewRecord(null);
+    setDescViewLoading(true);
+
+    try {
+      const existingFromMap = descriptionsByJobPositionId[jobPositionId];
+      if (existingFromMap) {
+        setDescViewRecord(existingFromMap);
+        return;
+      }
+
+      const res = await jobDescriptionApi.getAll();
+      const list = res?.data?.data || [];
+
+      const found = list.find((item) => {
+        const jpId = item?.jobPositionId ?? item?.jobPositionID ?? item?.jobPositionid;
+        return Number(jpId) === Number(jobPositionId);
+      });
+
+      const text = resolveJobDescriptionText(found);
+      setDescViewRecord(found ? { ...found, _text: text } : { jobPositionId, _text: "" });
+    } catch (err) {
+      console.error("Failed to load job description:", err);
+      messageApi.error("Failed to load job description");
+    } finally {
+      setDescViewLoading(false);
+    }
+  };
 
   const filteredRows = useMemo(() => {
     const q = (query || "").trim().toLowerCase();
@@ -361,8 +461,26 @@ export default function StudentJobsPage() {
       key: "description",
       render: (_, record) => {
         const text = descriptionsByJobPositionId[record.jobPositionId]?._text;
-        if (!text) return <span style={{ color: "#999" }}>—</span>;
-        return <span title={text}>{text.length > 80 ? `${text.slice(0, 80)}…` : text}</span>;
+        const preview = text ? (text.length > 80 ? `${text.slice(0, 80)}…` : text) : "";
+        return (
+          <div className="student-jobs-desc-cell">
+            {text ? (
+              <span className="student-jobs-desc-preview" title={text}>
+                {preview}
+              </span>
+            ) : (
+              <span style={{ color: "#999" }}>—</span>
+            )}
+            <Button
+              type="link"
+              size="small"
+              className="student-jobs-desc-viewall"
+              onClick={() => openDescriptionViewModal(record)}
+            >
+              View all
+            </Button>
+          </div>
+        );
       },
     },
     {
@@ -450,6 +568,50 @@ export default function StudentJobsPage() {
         loading={loading || applicationsLoading}
         pagination={{ pageSize: 8, showSizeChanger: true }}
       />
+
+      <Modal
+        title="Job description"
+        open={isDescViewOpen}
+        onCancel={() => setIsDescViewOpen(false)}
+        footer={[
+          <Button key="close" onClick={() => setIsDescViewOpen(false)}>
+            Close
+          </Button>,
+        ]}
+        width={720}
+      >
+        <Descriptions
+          bordered
+          size="small"
+          column={1}
+          items={[
+            {
+              key: "company",
+              label: "Company",
+              children: getCompanyNameForJob(descViewJob),
+            },
+            {
+              key: "hireQuantity",
+              label: "Hire quantity",
+              children: String(descViewRecord?.hireQuantity ?? 0),
+            },
+            {
+              key: "appliedQuantity",
+              label: "Apply quantity",
+              children: String(descViewRecord?.appliedQuantity ?? 0),
+            },
+            {
+              key: "description",
+              label: "Description",
+              children: (
+                <div className="student-jobs-desc-modal-text" aria-busy={descViewLoading}>
+                  {descViewLoading ? "Loading..." : descViewRecord?._text || "—"}
+                </div>
+              ),
+            },
+          ]}
+        />
+      </Modal>
     </div>
   );
 }

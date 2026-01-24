@@ -25,3 +25,30 @@
 .student-jobs-search {
   width: min(520px, 60vw);
 }
+
+.student-jobs-desc-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.student-jobs-desc-preview {
+  display: block;
+  max-width: 520px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.student-jobs-desc-viewall {
+  padding: 0;
+  height: auto;
+  line-height: 1.1;
+}
+
+.student-jobs-desc-modal-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 320px;
+  overflow: auto;
+}

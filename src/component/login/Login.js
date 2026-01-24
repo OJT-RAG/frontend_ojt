@@ -80,7 +80,49 @@ function Login() {
     }
 
     // Some backends incorrectly return a generic login system error for deactivated accounts
+    // NOTE: We intentionally do NOT treat this as deactivated for 400/401 (invalid credentials)
+    // and only use it as a weak signal elsewhere.
     if (s.includes('lỗi hệ thống khi đăng nhập') || s.includes('loi he thong khi dang nhap')) return true;
+
+    return false;
+  };
+
+  const isInvalidCredentialsMessage = (msg) => {
+    const s = String(msg ?? '').toLowerCase().trim();
+    if (!s) return false;
+
+    // English
+    if (
+      s.includes('invalid') ||
+      s.includes('incorrect') ||
+      s.includes('wrong') ||
+      s.includes('unauthorized') ||
+      s.includes('bad credentials') ||
+      s.includes('invalid credentials')
+    ) {
+      return true;
+    }
+
+    // Vietnamese
+    if (
+      s.includes('sai mật khẩu') ||
+      s.includes('sai mat khau') ||
+      s.includes('sai tài khoản') ||
+      s.includes('sai tai khoan') ||
+      s.includes('không đúng') ||
+      s.includes('khong dung')
+    ) {
+      return true;
+    }
+
+    // Common combined phrasing
+    if (
+      (s.includes('email') || s.includes('username') || s.includes('tài khoản') || s.includes('tai khoan')) &&
+      (s.includes('mật khẩu') || s.includes('mat khau') || s.includes('password')) &&
+      (s.includes('sai') || s.includes('không đúng') || s.includes('khong dung') || s.includes('invalid'))
+    ) {
+      return true;
+    }
 
     return false;
   };
@@ -103,16 +145,26 @@ function Login() {
       data?.accountStatus ?? data?.AccountStatus ?? data?.status ?? data?.Status ?? data?.data?.accountStatus ?? ''
     ).toLowerCase();
 
+    const isInvalidCredentials =
+      status === 400 ||
+      status === 401
+        ? isInvalidCredentialsMessage(message) || isInvalidCredentialsMessage(code) || true
+        : isInvalidCredentialsMessage(message) || isInvalidCredentialsMessage(code);
+
+    // If the server replied 400/401, it is almost always invalid credentials.
+    // Never label these as "deactivated".
+    const ignoreInactiveHeuristics = status === 400 || status === 401;
+
     const isInactive =
-      isInactiveMessage(message) ||
-      isInactiveMessage(code) ||
+      (!ignoreInactiveHeuristics && isInactiveMessage(message)) ||
+      (!ignoreInactiveHeuristics && isInactiveMessage(code)) ||
       accountStatus === 'inactive' ||
       accountStatus === 'disabled' ||
       accountStatus === 'deactive' ||
       accountStatus === 'deactivated' ||
       status === 423;
 
-    return { status, data, message, isInactive };
+    return { status, data, message, isInactive, isInvalidCredentials };
   };
 
   const googleClientId = useMemo(() => {
@@ -366,6 +418,7 @@ login(role, authUser, token);
         status: info.status,
         data: info.data,
         isInactive: info.isInactive,
+        isInvalidCredentials: info.isInvalidCredentials,
       };
     }
   };
@@ -385,6 +438,13 @@ login(role, authUser, token);
         setNotice('');
         return;
       }
+
+      if (result.isInvalidCredentials) {
+        setError(t('login_invalid_credentials') || 'Wrong username or password.');
+        setNotice('');
+        return;
+      }
+
       setError(result.message);
       return;
     }

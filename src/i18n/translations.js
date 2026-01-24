@@ -132,6 +132,7 @@ export const translations = {
     login_google_success: 'Logged in successfully with Google.',
     login_google_failed: 'Google login failed. Please try again.',
     login_account_deactivated: 'Your account has been deactivated by an administrator. Please contact Admin for more information.',
+    login_invalid_credentials: 'Wrong email or password. Please try again.',
 
     // SignUp
     signup_title: 'Create account',
@@ -278,6 +279,7 @@ export const translations = {
     admin_dash_activity_placeholder: 'Activity List Placeholder',
   },
   vi: {
+      login_invalid_credentials: 'Sai email hoặc mật khẩu. Vui lòng thử lại.',
     appName: 'Trợ lý OJT FPT',
     appTagline: 'Nền tảng tri thức hỗ trợ AI',
     nav_knowledge: 'Kho Kiến Thức',
@@ -548,6 +550,7 @@ export const translations = {
     admin_dash_activity_placeholder: 'Danh sách hoạt động (đang phát triển)',
   },
   ja: {
+      login_invalid_credentials: 'メールアドレスまたはパスワードが間違っています。もう一度お試しください。',
     appName: 'FPT OJT アシスタント',
     appTagline: 'AI搭載ナレッジプラットフォーム',
     nav_knowledge: 'ナレッジベース',

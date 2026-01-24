@@ -73,6 +73,28 @@ const JobManagement = ({ variant = "company" }) => {
   const [descExistingRecord, setDescExistingRecord] = useState(null);
   const [descForm] = Form.useForm();
 
+  // Description view-only modal (from Job Positions table)
+  const [isDescViewOpen, setIsDescViewOpen] = useState(false);
+  const [descViewLoading, setDescViewLoading] = useState(false);
+  const [descViewJob, setDescViewJob] = useState(null);
+  const [descViewRecord, setDescViewRecord] = useState(null);
+
+  const resolveJobDescriptionText = (item) => {
+    const text =
+      item?.jobDescription ??
+      item?.JobDescription ??
+      item?.jobDescription1 ??
+      item?.JobDescription1 ??
+      item?.description ??
+      item?.Description ??
+      item?.jobDesc ??
+      item?.JobDesc ??
+      item?._text ??
+      "";
+
+    return typeof text === "string" ? text : String(text ?? "");
+  };
+
   const fetchMajorsSemesters = async () => {
     try {
       const [majorRes, semesterRes] = await Promise.all([
@@ -225,7 +247,7 @@ const JobManagement = ({ variant = "company" }) => {
       const map = {};
       for (const item of list) {
         const jobPositionId = item.jobPositionId ?? item.jobPositionID ?? item.jobPositionid;
-        const text = item.jobDescription ?? item.description ?? item.jobDesc ?? "";
+        const text = resolveJobDescriptionText(item);
         if (jobPositionId != null) map[jobPositionId] = { ...item, _text: text };
       }
 
@@ -511,6 +533,43 @@ const JobManagement = ({ variant = "company" }) => {
     if (existingFromMap) setDescExistingRecord(existingFromMap);
   };
 
+  const openDescriptionViewModal = async (record) => {
+    const jobPositionId = record?.jobPositionId;
+    if (!jobPositionId) {
+      messageApi.warning("Missing Job Position ID");
+      return;
+    }
+
+    setIsDescViewOpen(true);
+    setDescViewJob(record);
+    setDescViewRecord(null);
+    setDescViewLoading(true);
+
+    try {
+      const existingFromMap = descriptionsByJobPositionId[jobPositionId];
+      if (existingFromMap) {
+        setDescViewRecord(existingFromMap);
+        return;
+      }
+
+      const res = await jobDescriptionApi.getAll();
+      const list = res.data?.data || [];
+
+      const found = list.find((item) => {
+        const jpId = item?.jobPositionId ?? item?.jobPositionID ?? item?.jobPositionid;
+        return Number(jpId) === Number(jobPositionId);
+      });
+
+      const text = resolveJobDescriptionText(found);
+      setDescViewRecord(found ? { ...found, _text: text } : { jobPositionId, _text: "" });
+    } catch (err) {
+      console.error("Failed to load job description:", err);
+      messageApi.error("Failed to load job description");
+    } finally {
+      setDescViewLoading(false);
+    }
+  };
+
   const openCreateDescriptionModal = () => {
     if (descriptionsReadOnly) {
       messageApi.info("Admin can only view job descriptions");
@@ -528,7 +587,7 @@ const JobManagement = ({ variant = "company" }) => {
       return;
     }
     const jobPositionId = record?.jobPositionId ?? record?.jobPositionID ?? record?.jobPositionid;
-    const text = record?.jobDescription ?? record?.description ?? record?.jobDesc ?? record?._text ?? "";
+    const text = resolveJobDescriptionText(record);
     setIsDescModalOpen(true);
     setDescEditJob({ jobTitle: jobTitleByPositionId[jobPositionId] || "-" });
     setDescExistingRecord(record);
@@ -805,12 +864,19 @@ const JobManagement = ({ variant = "company" }) => {
       title: "Description",
       key: "description",
       render: (_, record) => {
-        const text = descriptionsByJobPositionId[record.jobPositionId]?._text;
-        if (!text) return <span style={{ color: "#999" }}>—</span>;
+        const text = descriptionsByJobPositionId[record.jobPositionId]?._text || "";
+        const preview = text.length > 60 ? `${text.slice(0, 60)}…` : text;
+
         return (
-          <span title={text}>
-            {text.length > 60 ? `${text.slice(0, 60)}…` : text}
-          </span>
+          <Button
+            type="link"
+            size="small"
+            style={{ padding: 0 }}
+            icon={<FileText size={14} />}
+            onClick={() => openDescriptionViewModal(record)}
+          >
+            {text ? preview : "View"}
+          </Button>
         );
       },
     },
@@ -820,17 +886,9 @@ const JobManagement = ({ variant = "company" }) => {
     positionColumns.push({
       title: "Actions",
       key: "actions",
-      width: 320,
+      width: 240,
       render: (_, record) => (
         <div className="job-action-buttons">
-          <Button
-            size="small"
-            onClick={() => openDescriptionModal(record)}
-            icon={<FileText size={14} />}
-          >
-            Description
-          </Button>
-
           <Button
             type="primary"
             size="small"
@@ -884,7 +942,7 @@ const JobManagement = ({ variant = "company" }) => {
       title: "Description",
       key: "jobDescription",
       render: (_, record) => {
-        const text = record?.jobDescription ?? record?.description ?? record?.jobDesc ?? "";
+        const text = resolveJobDescriptionText(record);
         if (!text) return <span style={{ color: "#999" }}>—</span>;
         return <span title={text}>{text.length > 80 ? `${text.slice(0, 80)}…` : text}</span>;
       },
@@ -1252,6 +1310,97 @@ const JobManagement = ({ variant = "company" }) => {
 
           <Form.Item label="Active" name="isActive" valuePropName="checked">
             <Switch checkedChildren="Active" unCheckedChildren="Inactive" />
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/* JOB DESCRIPTION VIEW (READ-ONLY) */}
+      <Modal
+        title={
+          descViewJob
+            ? `Job Description: ${descViewJob.jobTitle || descViewJob.jobPositionId}`
+            : "Job Description"
+        }
+        open={isDescViewOpen}
+        onCancel={() => {
+          setIsDescViewOpen(false);
+          setDescViewJob(null);
+          setDescViewRecord(null);
+        }}
+        footer={
+          descriptionsReadOnly
+            ? (
+              <Button
+                type="primary"
+                onClick={() => {
+                  setIsDescViewOpen(false);
+                  setDescViewJob(null);
+                  setDescViewRecord(null);
+                }}
+              >
+                Close
+              </Button>
+            )
+            : [
+              <Button
+                key="update"
+                type="primary"
+                onClick={() => {
+                  const job = descViewJob;
+                  setIsDescViewOpen(false);
+                  setDescViewJob(null);
+                  setDescViewRecord(null);
+                  if (job) openDescriptionModal(job);
+                }}
+              >
+                Update
+              </Button>,
+              <Button
+                key="close"
+                onClick={() => {
+                  setIsDescViewOpen(false);
+                  setDescViewJob(null);
+                  setDescViewRecord(null);
+                }}
+              >
+                Close
+              </Button>,
+            ]
+        }
+        confirmLoading={descViewLoading}
+        destroyOnClose
+      >
+        <Form layout="vertical">
+          <Form.Item label="Job Position ID">
+            <Input value={descViewJob?.jobPositionId ?? ""} disabled />
+          </Form.Item>
+
+          <Form.Item label="Job Title">
+            <Input value={descViewJob?.jobTitle ?? ""} disabled />
+          </Form.Item>
+
+          <Form.Item label="Job Description">
+            <Input.TextArea
+              rows={8}
+              value={descViewRecord?._text || "No description yet."}
+              readOnly
+            />
+          </Form.Item>
+
+          <Form.Item label="Hire Quantity">
+            <InputNumber
+              style={{ width: "100%" }}
+              value={descViewRecord?.hireQuantity ?? 0}
+              disabled
+            />
+          </Form.Item>
+
+          <Form.Item label="Applied Quantity">
+            <InputNumber
+              style={{ width: "100%" }}
+              value={descViewRecord?.appliedQuantity ?? 0}
+              disabled
+            />
           </Form.Item>
         </Form>
       </Modal>
