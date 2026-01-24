@@ -22,11 +22,13 @@ function SignUp() {
   });
   const [touched, setTouched] = useState({
     fullname: false,
+    email: false,
     studentCode: false,
     phone: false,
   });
   const [errors, setErrors] = useState({
     fullname: '',
+    email: '',
     studentCode: '',
     phone: '',
   });
@@ -39,6 +41,19 @@ function SignUp() {
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
   const { t } = useI18n();
+
+  const tr = (key, fallback) => {
+    const v = t(key);
+    return v === key ? fallback : v;
+  };
+
+  const normalizeEmail = (value) => String(value || '').trim().toLowerCase();
+  const normalizeStudentCode = (value) => String(value || '').trim().toLowerCase();
+  const normalizePhone = (value) => String(value || '').replace(/\D+/g, '');
+
+  const getUserEmail = (u) => u?.email ?? u?.Email ?? u?.userEmail ?? u?.UserEmail;
+  const getUserPhone = (u) => u?.phone ?? u?.Phone ?? u?.mobile ?? u?.Mobile ?? u?.phoneNumber ?? u?.PhoneNumber;
+  const getUserStudentCode = (u) => u?.studentCode ?? u?.StudentCode ?? u?.student_code ?? u?.Student_Code;
 
   function validateField(name, value) {
     const v = (value ?? '').toString().trim();
@@ -54,6 +69,13 @@ function SignUp() {
       if (!v) return '';
       // No special characters. Allow letters and digits only.
       if (!/^[A-Za-z0-9]+$/.test(v)) return t('error_studentcode_invalid');
+      return '';
+    }
+
+    if (name === 'email') {
+      if (!v) return tr('error_email_required', 'Email is required.');
+      // Lightweight email check; input type=email handles most cases.
+      if (!/^\S+@\S+\.\S+$/.test(v)) return tr('error_email_invalid', 'Email is invalid.');
       return '';
     }
 
@@ -75,18 +97,56 @@ function SignUp() {
     }
 
     setForm((prev) => ({ ...prev, [name]: value }));
-    if (name === 'fullname' || name === 'studentCode' || name === 'phone') {
+    if (name === 'fullname' || name === 'studentCode' || name === 'phone' || name === 'email') {
       setErrors((prev) => ({ ...prev, [name]: validateField(name, value) }));
     }
   }
 
   function onBlur(e) {
     const { name, value } = e.target;
-    if (name === 'fullname' || name === 'studentCode' || name === 'phone') {
+    if (name === 'fullname' || name === 'studentCode' || name === 'phone' || name === 'email') {
       setTouched((prev) => ({ ...prev, [name]: true }));
       setErrors((prev) => ({ ...prev, [name]: validateField(name, value) }));
     }
   }
+
+  const checkDuplicates = async () => {
+    const email = normalizeEmail(form.email);
+    const phone = normalizePhone(form.phone);
+    const studentCode = normalizeStudentCode(form.studentCode);
+
+    // Only check fields that are filled.
+    if (!email && !phone && !studentCode) return { email: '', phone: '', studentCode: '' };
+
+    const res = await userApi.getAll();
+    const list = Array.isArray(res?.data?.data) ? res.data.data : Array.isArray(res?.data) ? res.data : [];
+
+    let emailDup = false;
+    let phoneDup = false;
+    let studentDup = false;
+
+    for (const u of list) {
+      if (!emailDup && email) {
+        const uEmail = normalizeEmail(getUserEmail(u));
+        if (uEmail && uEmail === email) emailDup = true;
+      }
+      if (!phoneDup && phone) {
+        const uPhone = normalizePhone(getUserPhone(u));
+        if (uPhone && uPhone === phone) phoneDup = true;
+      }
+      if (!studentDup && studentCode) {
+        const uStudent = normalizeStudentCode(getUserStudentCode(u));
+        if (uStudent && uStudent === studentCode) studentDup = true;
+      }
+      if (emailDup && phoneDup && studentDup) break;
+    }
+
+    return {
+      email: emailDup ? tr('error_email_duplicate', 'Email already exists.') : '',
+      phone: phoneDup ? tr('error_phone_duplicate', 'Phone already exists.') : '',
+      studentCode: studentDup ? tr('error_studentcode_duplicate', 'Student number already exists.') : '',
+    };
+  };
 
   const loadMajors = async () => {
     let cancelled = false;
@@ -154,11 +214,12 @@ function SignUp() {
 
     const nextErrors = {
       fullname: validateField('fullname', form.fullname),
+      email: validateField('email', form.email),
       studentCode: validateField('studentCode', form.studentCode),
       phone: validateField('phone', form.phone),
     };
     setErrors((prev) => ({ ...prev, ...nextErrors }));
-    setTouched((prev) => ({ ...prev, fullname: true, studentCode: true, phone: true }));
+    setTouched((prev) => ({ ...prev, fullname: true, email: true, studentCode: true, phone: true }));
     if (Object.values(nextErrors).some(Boolean)) {
       return;
     }
@@ -167,6 +228,27 @@ function SignUp() {
       alert(t('error_password_mismatch'));
       return;
     }
+
+    // Duplicate validation (email/phone/student number)
+    try {
+      const dupErrors = await checkDuplicates();
+      if (dupErrors.email || dupErrors.phone || dupErrors.studentCode) {
+        setTouched((prev) => ({ ...prev, email: true, studentCode: true, phone: true }));
+        setErrors((prev) => ({
+          ...prev,
+          email: dupErrors.email || prev.email,
+          phone: dupErrors.phone || prev.phone,
+          studentCode: dupErrors.studentCode || prev.studentCode,
+        }));
+        return;
+      }
+    } catch (dupErr) {
+      // eslint-disable-next-line no-console
+      console.warn('[SignUp] duplicate check failed', dupErr);
+      alert(tr('error_duplicate_check_failed', 'Cannot validate duplicates right now. Please try again.'));
+      return;
+    }
+
     setSubmitting(true);
     try {
       // Backend (Swagger) expects multipart/form-data for /api/user/create.
@@ -278,7 +360,20 @@ function SignUp() {
         {touched.fullname && errors.fullname && (
           <div className="field-error" role="alert">{errors.fullname}</div>
         )}
-        <input name="email" type="email" placeholder={t('email_placeholder')} value={form.email} onChange={onChange} required aria-label="Email" />
+        <input
+          className={touched.email && errors.email ? 'input-error' : ''}
+          name="email"
+          type="email"
+          placeholder={t('email_placeholder')}
+          value={form.email}
+          onChange={onChange}
+          onBlur={onBlur}
+          required
+          aria-label="Email"
+        />
+        {touched.email && errors.email && (
+          <div className="field-error" role="alert">{errors.email}</div>
+        )}
         <input name="password" type="password" placeholder={t('password')} value={form.password} onChange={onChange} required aria-label={t('password')} />
         <input name="confirm" type="password" placeholder={t('confirm_password')} value={form.confirm} onChange={onChange} required aria-label={t('confirm_password')} />
 
@@ -364,7 +459,7 @@ function SignUp() {
         <div className="row">
           <button
             type="submit"
-            disabled={submitting || Boolean(errors.fullname) || Boolean(errors.studentCode) || Boolean(errors.phone)}
+            disabled={submitting || Boolean(errors.fullname) || Boolean(errors.email) || Boolean(errors.studentCode) || Boolean(errors.phone)}
           >
             {submitting ? t('creating') : t('create_account_btn')}
           </button>
