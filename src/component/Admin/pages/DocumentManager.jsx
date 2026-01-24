@@ -40,6 +40,9 @@ const DocumentManager = () => {
   const [semesters, setSemesters] = useState([]);
 
   const [filter, setFilter] = useState("all"); // all | general | semester
+  const [semesterFilterOpen, setSemesterFilterOpen] = useState(false);
+  const [semesterFilterSemesterId, setSemesterFilterSemesterId] = useState("");
+  const [semesterFilterDraftId, setSemesterFilterDraftId] = useState("");
   const [search, setSearch] = useState("");
 
   const tableWrapperRef = useRef(null);
@@ -259,6 +262,21 @@ const DocumentManager = () => {
     }
     return map;
   }, [semesters]);
+
+  const isSemesterActive = (value) => {
+    if (value === true) return true;
+    if (value === 1) return true;
+    if (typeof value === "string") {
+      const v = value.trim().toLowerCase();
+      return v === "true" || v === "1";
+    }
+    return false;
+  };
+
+  const selectedSemesterLabel = useMemo(() => {
+    const key = Number(semesterFilterSemesterId);
+    return semesterNameById.get(key) || semesterFilterSemesterId || "";
+  }, [semesterFilterSemesterId, semesterNameById]);
 
   const getDocId = (doc) => {
     const extractFromObject = (obj) => {
@@ -651,7 +669,10 @@ const DocumentManager = () => {
     return (documents || [])
       .filter((d) => {
         if (filter === "general") return !!d?.isGeneral;
-        if (filter === "semester") return !d?.isGeneral;
+        if (filter === "semester") {
+          if (!semesterFilterSemesterId) return false;
+          return String(d?.semesterId ?? "") === String(semesterFilterSemesterId);
+        }
         return true;
       })
       .filter((d) => {
@@ -659,7 +680,30 @@ const DocumentManager = () => {
         const title = String(d?.title || "").toLowerCase();
         return title.includes(q);
       });
-  }, [documents, filter, search]);
+  }, [documents, filter, search, semesterFilterSemesterId]);
+
+  const openSemesterFilterPicker = useCallback(() => {
+    const active = (semesters || []).find((s) => isSemesterActive(s?.isActive));
+    const fallback = active?.semesterId ?? semesters?.[0]?.semesterId ?? "";
+    const initial = String(semesterFilterSemesterId || fallback || "");
+    setSemesterFilterDraftId(initial);
+    setSemesterFilterOpen(true);
+  }, [semesters, semesterFilterSemesterId]);
+
+  const closeSemesterFilterPicker = () => {
+    setSemesterFilterOpen(false);
+  };
+
+  const applySemesterFilter = () => {
+    const value = String(semesterFilterDraftId || "").trim();
+    if (!value) {
+      window.alert("Please choose a semester.");
+      return;
+    }
+    setSemesterFilterSemesterId(value);
+    setFilter("semester");
+    setSemesterFilterOpen(false);
+  };
 
   useEffect(() => {
     setPage(1);
@@ -794,7 +838,14 @@ const DocumentManager = () => {
           <div className="dm-toolbar-right">
             <button className={`chip ${filter === "all" ? "active" : ""}`} type="button" onClick={() => setFilter("all")}>All</button>
             <button className={`chip ${filter === "general" ? "active" : ""}`} type="button" onClick={() => setFilter("general")}>General</button>
-            <button className={`chip ${filter === "semester" ? "active" : ""}`} type="button" onClick={() => setFilter("semester")}>By Semester</button>
+            <button
+              className={`chip ${filter === "semester" ? "active" : ""}`}
+              type="button"
+              onClick={openSemesterFilterPicker}
+              title={selectedSemesterLabel ? `Semester: ${selectedSemesterLabel}` : "Choose a semester"}
+            >
+              By Semester{selectedSemesterLabel ? `: ${selectedSemesterLabel}` : ""}
+            </button>
           </div>
         </div>
 
@@ -985,6 +1036,46 @@ const DocumentManager = () => {
           </div>
         )}
       </div>
+
+      {semesterFilterOpen && (
+        <div className="dm-modal-overlay" onClick={closeSemesterFilterPicker}>
+          <div className="dm-modal" onClick={(e) => e.stopPropagation()}>
+            <h3>Choose semester</h3>
+
+            <div className="dm-form">
+              <label>
+                Semester
+                {semesters.length > 0 ? (
+                  <select value={semesterFilterDraftId} onChange={(e) => setSemesterFilterDraftId(e.target.value)}>
+                    <option value="">Select a semester...</option>
+                    {semesters.map((s) => (
+                      <option key={s?.semesterId} value={String(s?.semesterId ?? "")}>
+                        {s?.name || s?.semesterName || s?.semesterId}
+                        {isSemesterActive(s?.isActive) ? " (Active)" : ""}
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input
+                    value={semesterFilterDraftId}
+                    onChange={(e) => setSemesterFilterDraftId(e.target.value)}
+                    placeholder="SemesterId"
+                  />
+                )}
+              </label>
+
+              <div className="dm-form-actions">
+                <button className="btn-primary" type="button" onClick={applySemesterFilter}>
+                  Apply
+                </button>
+                <button className="btn-secondary" type="button" onClick={closeSemesterFilterPicker}>
+                  Cancel
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {uploadOpen && (
         <div className="dm-modal-overlay" onClick={closeUpload}>

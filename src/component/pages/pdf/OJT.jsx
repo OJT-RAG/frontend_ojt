@@ -3,6 +3,7 @@ import { Document, Page, pdfjs } from 'react-pdf';
 import './OJT.scss';
 
 import ojtDocumentApi from '../../API/OjtDocumentAPI';
+import semesterApi from '../../API/SemesterAPI';
 
 // Configure pdf.js worker via react-pdf's pdfjs wrapper
 pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.mjs`;
@@ -11,6 +12,7 @@ export default function OJT() {
 	const [docs, setDocs] = useState([]);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
+	const [activeSemester, setActiveSemester] = useState(null);
 
 	const [activeDoc, setActiveDoc] = useState(null);
 	const [numPages, setNumPages] = useState(null);
@@ -77,6 +79,55 @@ export default function OJT() {
 		);
 	};
 
+	const getSemesterId = (doc) => {
+		const extractFromObject = (obj) => {
+			if (!obj || typeof obj !== 'object') return null;
+			const directCandidates = [
+				obj.semesterId,
+				obj.SemesterId,
+				obj.semesterID,
+				obj.SemesterID,
+				obj.semester_id,
+				obj.semester?.semesterId,
+				obj.semester?.SemesterId,
+				obj.semester?.id,
+				obj.Semester?.semesterId,
+				obj.Semester?.id,
+			];
+			for (const value of directCandidates) {
+				if (value == null) continue;
+				const n = Number(value);
+				if (Number.isFinite(n) && n > 0) return n;
+				const s = String(value).trim();
+				if (s !== '') return value;
+			}
+			return null;
+		};
+
+		return (
+			extractFromObject(doc) ||
+			extractFromObject(doc?.ojtDocument) ||
+			extractFromObject(doc?.OjtDocument) ||
+			extractFromObject(doc?.data) ||
+			null
+		);
+	};
+
+	const getActiveSemesterId = (sem) => {
+		if (!sem) return null;
+		return sem?.semesterId ?? sem?.SemesterId ?? sem?.id ?? sem?.Id ?? null;
+	};
+
+	const isSemesterActive = (value) => {
+		if (value === true) return true;
+		if (value === 1) return true;
+		if (typeof value === 'string') {
+			const v = value.trim().toLowerCase();
+			return v === 'true' || v === '1';
+		}
+		return false;
+	};
+
 	const getGoogleDriveFileId = (url) => {
 		if (!url) return '';
 		try {
@@ -124,6 +175,21 @@ export default function OJT() {
 			setLoading(true);
 			setError('');
 			try {
+				const semesterRes = await semesterApi.getAll();
+				const semesters = Array.isArray(semesterRes?.data) ? semesterRes.data : semesterRes?.data?.data || [];
+				const activeSem = (Array.isArray(semesters) ? semesters : []).find((s) => isSemesterActive(s?.isActive));
+				const activeSemesterId = getActiveSemesterId(activeSem);
+				if (!activeSem || !activeSemesterId) {
+					if (cancelled) return;
+					setActiveSemester(null);
+					setDocs([]);
+					setActiveDoc(null);
+					setError('No active semester configured.');
+					return;
+				}
+				if (cancelled) return;
+				setActiveSemester(activeSem);
+
 				const res = await ojtDocumentApi.getAll();
 				const list = res?.data?.data || [];
 				const normalized = (Array.isArray(list) ? list : [])
@@ -133,9 +199,10 @@ export default function OJT() {
 						title: d?.title || '(untitled)',
 						url: d?.fileUrl,
 						isGeneral: !!d?.isGeneral,
-						semesterId: d?.semesterId,
+						semesterId: getSemesterId(d),
 					}))
-					.filter((d) => !!d.url);
+					.filter((d) => !!d.url)
+					.filter((d) => String(d?.semesterId ?? '') === String(activeSemesterId));
 
 				normalized.sort((a, b) => {
 					const aNum = Number(a.id);
@@ -154,6 +221,7 @@ export default function OJT() {
 			} catch (e) {
 				if (cancelled) return;
 				setDocs([]);
+				setActiveSemester(null);
 				setActiveDoc(null);
 				setError(e?.response?.data?.message || e?.message || 'Failed to load documents');
 			} finally {
@@ -165,6 +233,24 @@ export default function OJT() {
 			cancelled = true;
 		};
 	}, []);
+
+	const openDoc = (doc) => {
+		const activeSemesterId = getActiveSemesterId(activeSemester);
+		const docSemesterId = doc?.semesterId;
+		if (!activeSemesterId) {
+			alert('No active semester configured.');
+			return;
+		}
+		if (String(docSemesterId ?? '') !== String(activeSemesterId)) {
+			alert('This document is not available in the active semester.');
+			return;
+		}
+		setActiveDoc(doc);
+		setNumPages(null);
+		setPage(1);
+		setPdfFailed(false);
+		setPdfError('');
+	};
 
 	useEffect(() => {
 		// When switching documents, retry PDF preview.
@@ -424,7 +510,14 @@ export default function OJT() {
 	return (
 		<div className="ojt-page">
 			<div className="ojt-sidebar">
-				<h2 className="ojt-heading">OJT Documents</h2>
+				<h2 className="ojt-heading">
+					OJT Documents
+					{activeSemester?.name || activeSemester?.semesterName ? (
+						<span style={{ fontWeight: 500, opacity: 0.75, marginLeft: 8, fontSize: 14 }}>
+							({activeSemester?.name || activeSemester?.semesterName})
+						</span>
+					) : null}
+				</h2>
 				{loading ? (
 					<div className="ojt-loading">Đang tải tài liệu...</div>
 				) : error ? (
@@ -437,7 +530,7 @@ export default function OJT() {
 						<li key={d.id}>
 							<button
 								className={`doc-btn ${activeDoc?.id === d.id ? 'active' : ''}`}
-								onClick={() => { setActiveDoc(d); setNumPages(null); setPage(1); setPdfFailed(false); setPdfError(''); }}
+								onClick={() => openDoc(d)}
 							>{d.title}</button>
 						</li>
 					))}
