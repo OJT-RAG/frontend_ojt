@@ -1,8 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { notification } from 'antd';
 import { useI18n } from '../../i18n/i18n.jsx';
 import majorApi from '../API/MajorAPI';
-import companyApi from '../API/CompanyAPI';
 import userApi from '../API/UserAPI';
 import './SignUp.scss';
 
@@ -16,7 +16,6 @@ function SignUp() {
     phone: '',
     dob: '',
     majorId: '',
-    companyId: '',
     avatarFile: null,
     cvFile: null,
   });
@@ -35,9 +34,6 @@ function SignUp() {
   const [majors, setMajors] = useState([]);
   const [majorsLoading, setMajorsLoading] = useState(false);
   const [majorsError, setMajorsError] = useState('');
-  const [companies, setCompanies] = useState([]);
-  const [companiesLoading, setCompaniesLoading] = useState(false);
-  const [companiesError, setCompaniesError] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const navigate = useNavigate();
   const { t } = useI18n();
@@ -176,36 +172,8 @@ function SignUp() {
     return () => { cancelled = true; };
   };
 
-  const loadCompanies = async () => {
-    let cancelled = false;
-    setCompaniesError('');
-    setCompaniesLoading(true);
-    try {
-      const res = await companyApi.getAll();
-      const list = Array.isArray(res?.data?.data) ? res.data.data : Array.isArray(res?.data) ? res.data : [];
-      const normalized = list
-        .map((c) => {
-          const id = c?.company_ID ?? c?.Company_ID ?? c?.companyId ?? c?.CompanyId ?? c?.id ?? c?.Id;
-          const name = c?.name ?? c?.Name;
-          if (id == null) return null;
-          return { id: String(id), name: name ? String(name) : String(id) };
-        })
-        .filter(Boolean);
-      if (!cancelled) setCompanies(normalized);
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to load companies', e);
-      setCompaniesError(e?.message || 'Failed to load companies');
-      if (!cancelled) setCompanies([]);
-    } finally {
-      if (!cancelled) setCompaniesLoading(false);
-    }
-    return () => { cancelled = true; };
-  };
-
   useEffect(() => {
     loadMajors();
-    loadCompanies();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -225,7 +193,11 @@ function SignUp() {
     }
 
     if (form.password !== form.confirm) {
-      alert(t('error_password_mismatch'));
+      notification.error({
+        message: t('error_password_mismatch'),
+        placement: 'topRight',
+        duration: 3,
+      });
       return;
     }
 
@@ -245,7 +217,11 @@ function SignUp() {
     } catch (dupErr) {
       // eslint-disable-next-line no-console
       console.warn('[SignUp] duplicate check failed', dupErr);
-      alert(tr('error_duplicate_check_failed', 'Cannot validate duplicates right now. Please try again.'));
+      notification.error({
+        message: tr('error_duplicate_check_failed', 'Cannot validate duplicates right now. Please try again.'),
+        placement: 'topRight',
+        duration: 3,
+      });
       return;
     }
 
@@ -254,8 +230,8 @@ function SignUp() {
       // Backend (Swagger) expects multipart/form-data for /api/user/create.
       const fd = new FormData();
       fd.append('MajorId', String(form.majorId ? Number(form.majorId) : 0));
-      // CompanyId can be sent as an empty value (Swagger: -F 'CompanyId=').
-      fd.append('CompanyId', form.companyId ? String(Number(form.companyId)) : '');
+      // CompanyId is intentionally not chosen at signup; send empty for backend compatibility.
+      fd.append('CompanyId', '');
       fd.append('Email', form.email || '');
       fd.append('Password', form.password || '');
       fd.append('Fullname', form.fullname || '');
@@ -301,8 +277,16 @@ function SignUp() {
 
       const res = await userApi.create(fd);
       const serverMsg = res?.data?.message;
-      alert(serverMsg || t('signup_submit_success'));
-      navigate('/login', { replace: true });
+      notification.success({
+        message: serverMsg || t('signup_created_account') || 'Created new account.',
+        placement: 'topRight',
+        duration: 3,
+      });
+
+      // Give the toast time to render before unmounting this page.
+      window.setTimeout(() => {
+        navigate('/login', { replace: true, state: { flash: 'signup_success' } });
+      }, 350);
     } catch (err) {
       // eslint-disable-next-line no-console
       console.error('Signup failed:', {
@@ -314,7 +298,11 @@ function SignUp() {
         method: err?.config?.method,
       });
       const serverMsg = err?.response?.data?.message || err?.response?.data?.error;
-      alert(serverMsg || err.message || t('signup_submit_error'));
+      notification.error({
+        message: serverMsg || err?.message || t('signup_submit_error'),
+        placement: 'topRight',
+        duration: 4,
+      });
     } finally {
       setSubmitting(false);
     }
@@ -425,28 +413,6 @@ function SignUp() {
             </button>
           </div>
         )}
-        <select name="companyId" value={form.companyId} onChange={onChange} aria-label={t('company')}>
-          <option value="">{companiesLoading ? t('loading') : '(no company)'}</option>
-          {companies.map((c, idx) => {
-            const id = (c && typeof c === 'object') ? c.id : (c != null ? String(c) : String(idx));
-            const label = (c && typeof c === 'object') ? (c.name || id) : (c != null ? String(c) : id);
-            return (
-              <option key={`${id}-${idx}`} value={id}>{label}</option>
-            );
-          })}
-          {!companiesLoading && companies.length === 0 && (
-            <option value="" disabled>(No companies found)</option>
-          )}
-        </select>
-        {companiesError && (
-          <div style={{ fontSize: '12px', color: '#b94a48', marginTop: '6px' }}>
-            {companiesError}
-            <button type="button" onClick={loadCompanies} style={{ marginLeft: 8 }} disabled={companiesLoading}>
-              {companiesLoading ? t('loading') : 'Reload Companies'}
-            </button>
-          </div>
-        )}
-
       <label style={{ width: '100%', display: 'block' }}>
         {t('avatar_url')}
         <input name="avatarFile" type="file" accept="image/*" onChange={onChange} aria-label={t('avatar_url')} />

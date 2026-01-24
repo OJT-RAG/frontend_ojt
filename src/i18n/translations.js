@@ -158,6 +158,7 @@ export const translations = {
     error_phone_invalid: 'Phone can only contain digits.',
     signup_submit_success: 'Account created successfully.',
     signup_submit_error: 'Failed to create account.',
+    signup_created_account: 'Created new account.',
 
     // Forgot Password
     forgot_title: 'Forgot password',
@@ -428,6 +429,7 @@ export const translations = {
     error_studentcode_invalid: 'Mã sinh viên không được chứa ký tự đặc biệt.',
     error_phone_invalid: 'Số điện thoại chỉ được chứa chữ số.',
     signup_submit_success: 'Tạo tài khoản thành công.',
+    signup_created_account: 'Tạo tài khoản mới thành công.',
     signup_submit_error: 'Tạo tài khoản thất bại.',
 
     forgot_title: 'Quên mật khẩu',
@@ -683,6 +685,7 @@ export const translations = {
     error_phone_invalid: '電話番号は数字のみ使用できます。',
     signup_submit_success: 'アカウントが正常に作成されました。',
     signup_submit_error: 'アカウントの作成に失敗しました。',
+    signup_created_account: '新しいアカウントを作成しました。',
 
     forgot_title: 'パスワードをお忘れですか',
     forgot_desc: 'アカウントのメールアドレスを入力すると、リセットリンクを送信します。',

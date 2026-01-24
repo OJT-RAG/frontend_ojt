@@ -23,6 +23,7 @@ function Login() {
   const { login } = useAuth();
 
   const deactivatedPopupShownRef = useRef(false);
+  const signupPopupShownRef = useRef(false);
 
   useEffect(() => {
     const reason = location?.state?.reason;
@@ -38,7 +39,26 @@ function Login() {
     });
     // Also show inline error message on the form.
     setError(t('login_account_deactivated'));
+
+    // Clear navigation state so refresh/back won't re-trigger the popup.
+    navigate('/login', { replace: true, state: {} });
   }, [location?.state, t]);
+
+  useEffect(() => {
+    const flash = location?.state?.flash;
+    if (flash !== 'signup_success') return;
+    if (signupPopupShownRef.current) return;
+    signupPopupShownRef.current = true;
+
+    notification.success({
+      message: t('signup_created_account') || 'Created new account.',
+      placement: 'topRight',
+      duration: 3,
+    });
+
+    // Clear state so it doesn't show again on refresh/back.
+    navigate('/login', { replace: true, state: {} });
+  }, [location?.state, navigate, t]);
 
   const isInactiveAccount = (user) => {
     const raw = user?.accountStatus ?? user?.AccountStatus ?? user?.status ?? user?.Status;

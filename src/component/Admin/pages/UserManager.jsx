@@ -83,6 +83,7 @@ const UserManager = () => {
 
   const [query, setQuery] = useState('');
   const [majorFilter, setMajorFilter] = useState('');
+  const [roleFilter, setRoleFilter] = useState('');
 
   useEffect(() => {
     let cancelled = false;
@@ -148,16 +149,23 @@ const UserManager = () => {
   const filteredUsers = useMemo(() => {
     const q = query.trim().toLowerCase();
     const majorId = majorFilter ? Number(majorFilter) : null;
+    const role = roleFilter ? String(roleFilter).trim().toLowerCase() : '';
 
     return users.filter((u) => {
       if (majorId != null && Number(u?.majorId) !== majorId) return false;
+
+      if (role) {
+        const userRole = String(u?.role ?? u?.Role ?? '').trim().toLowerCase();
+        if (userRole !== role) return false;
+      }
+
       if (!q) return true;
       const studentCode = String(u?.studentCode || '').toLowerCase();
       const fullname = String(u?.fullname || '').toLowerCase();
       const email = String(u?.email || '').toLowerCase();
       return studentCode.includes(q) || fullname.includes(q) || email.includes(q);
     });
-  }, [users, query, majorFilter]);
+  }, [users, query, majorFilter, roleFilter]);
 
   const exportCsv = () => {
     const rows = filteredUsers.map((u) => {
@@ -555,6 +563,13 @@ const UserManager = () => {
             {majorOptions.map((m) => (
               <option key={m.id} value={m.id}>{m.name}</option>
             ))}
+          </select>
+          <select value={roleFilter} onChange={(e) => setRoleFilter(e.target.value)}>
+            <option value="">All Roles</option>
+            <option value="admin">Admin</option>
+            <option value="student">Student</option>
+            <option value="cro_staff">CRO Staff</option>
+            <option value="company">Company</option>
           </select>
           <button className="btn-secondary" type="button" onClick={exportCsv} disabled={loading || filteredUsers.length === 0}>
             Export List
