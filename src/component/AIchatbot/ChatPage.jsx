@@ -866,18 +866,19 @@ const sendStaffMessage = async (session) => {
 
   // ✅ HARD BLOCK AI IF STAFF CHAT
   if (currentSession?.type === "staff") {
-    if (!canChatWithStaff) {
-      setLastError("Staff chat is only available for students");
-      return;
-    }
-    if (!inputValue.trim()) {
-      setLastError("Please enter a message for staff");
-      return;
-    }
-
-    await sendStaffMessage(currentSession);
-    return; // ❌ TUYỆT ĐỐI KHÔNG CHẠY CODE AI
+  if (!canChatWithStaff) {
+    setLastError("Staff chat is only available for students");
+    return;
   }
+
+  if (!inputValue.trim()) {
+    setLastError("Please enter a message");
+    return;
+  }
+
+  await sendStaffMessage(currentSession);
+  return; // ✅ chỉ return cho staff flow
+}
     if (sending) return;
     const text = inputValue.trim();
 
@@ -1145,11 +1146,8 @@ const sendStaffMessage = async (session) => {
 >
   {hasStaffSession ? "Staff chat already created" : "Chat with staff"}
 </button>
-
             )}
-
           </div>
-
           <div className="session-list">
             {visibleSessions.map((session, index) => {
               const displayTitle =
