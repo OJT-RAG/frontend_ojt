@@ -1,6 +1,11 @@
 import React, { createContext, useContext, useState } from "react";
 
 const AuthContext = createContext();
+const encodeToken = (token) =>
+  btoa(unescape(encodeURIComponent(token)));
+
+const decodeToken = (encoded) =>
+  decodeURIComponent(escape(atob(encoded)));
 
 export const AuthProvider = ({ children }) => {
   const [authUser, setAuthUser] = useState(() => {
@@ -15,15 +20,21 @@ export const AuthProvider = ({ children }) => {
   });
 
   const login = (newRole, user, token) => {
-    const normalizedRole = (newRole || "guest").toLowerCase();
-    const normalizedUser = user ? { ...user, role: normalizedRole } : user;
+  const normalizedRole = (newRole || "guest").toLowerCase();
+  const normalizedUser = user ? { ...user, role: normalizedRole } : user;
 
-    setRole(normalizedRole);
-    setAuthUser(normalizedUser);
-    localStorage.setItem("userRole", normalizedRole);
-    localStorage.setItem("authUser", JSON.stringify(normalizedUser));
-    if (token) localStorage.setItem("token", token);
-  };
+  setRole(normalizedRole);
+  setAuthUser(normalizedUser);
+
+  localStorage.setItem("userRole", normalizedRole);
+  localStorage.setItem("authUser", JSON.stringify(normalizedUser));
+
+  if (token) {
+    const encodedToken = encodeToken(token);
+    localStorage.setItem("token", encodedToken);
+  }
+};
+
 
   const logout = () => {
     setRole("guest");

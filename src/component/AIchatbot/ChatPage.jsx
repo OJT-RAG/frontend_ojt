@@ -590,7 +590,10 @@ const ChatPage = () => {
   );
 
   const isStaffSession = activeSession?.type === "staff";
-
+  const hasStaffSession = useMemo(
+  () => sessions.some(s => s.type === "staff"),
+  [sessions]
+);
   useEffect(() => {
     if (!activeSessionId && sessions.length > 0) {
       setActiveSessionId(sessions[0].id);
@@ -1121,25 +1124,28 @@ const sendStaffMessage = async (session) => {
             </button>
             {canChatWithStaff && (
               <button
-                className="staff-chat-btn"
-                type="button"
-                onClick={() => {
-                  const staff = getFixedStaff(staffList, currentUserId);
+  className="staff-chat-btn"
+  type="button"
+  disabled={hasStaffSession}   // ✅ BLOCK Ở ĐÂY
+  onClick={() => {
+    if (hasStaffSession) return; // ✅ CHỐT HẠ
+    
+    const staff = getFixedStaff(staffList, currentUserId);
+    if (!staff) {
+      setLastError("No staff available");
+      return;
+    }
 
-                  if (!staff) {
-                    setLastError("No staff available");
-                    return;
-                  }
+    const session = createStaffSession(staff);
+    if (!session) return;
 
-                  const session = createStaffSession(staff);
-                  if (!session) return;
+    setSessions((prev) => [session, ...prev]);
+    setActiveSessionId(session.id);
+  }}
+>
+  {hasStaffSession ? "Staff chat already created" : "Chat with staff"}
+</button>
 
-                  setSessions((prev) => [session, ...prev]);
-                  setActiveSessionId(session.id);
-                }}
-              >
-                Chat with staff
-              </button>
             )}
 
           </div>
