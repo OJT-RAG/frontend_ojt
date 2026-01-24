@@ -1,11 +1,6 @@
 import React, { createContext, useContext, useState } from "react";
 
 const AuthContext = createContext();
-const encodeToken = (token) =>
-  btoa(unescape(encodeURIComponent(token)));
-
-const decodeToken = (encoded) =>
-  decodeURIComponent(escape(atob(encoded)));
 
 export const AuthProvider = ({ children }) => {
   const [authUser, setAuthUser] = useState(() => {
@@ -15,26 +10,26 @@ export const AuthProvider = ({ children }) => {
       return null;
     }
   });
+
   const [role, setRole] = useState(() => {
     return (localStorage.getItem("userRole") || "guest").toLowerCase();
   });
 
   const login = (newRole, user, token) => {
-  const normalizedRole = (newRole || "guest").toLowerCase();
-  const normalizedUser = user ? { ...user, role: normalizedRole } : user;
+    const normalizedRole = (newRole || "guest").toLowerCase();
+    const normalizedUser = user ? { ...user, role: normalizedRole } : null;
 
-  setRole(normalizedRole);
-  setAuthUser(normalizedUser);
+    setRole(normalizedRole);
+    setAuthUser(normalizedUser);
 
-  localStorage.setItem("userRole", normalizedRole);
-  localStorage.setItem("authUser", JSON.stringify(normalizedUser));
+    localStorage.setItem("userRole", normalizedRole);
+    localStorage.setItem("authUser", JSON.stringify(normalizedUser));
 
-  if (token) {
-    const encodedToken = encodeToken(token);
-    localStorage.setItem("token", encodedToken);
-  }
-};
-
+    // 🔥 LƯU JWT GỐC – KHÔNG encode
+    if (token) {
+      localStorage.setItem("token", token);
+    }
+  };
 
   const logout = () => {
     setRole("guest");
@@ -42,6 +37,7 @@ export const AuthProvider = ({ children }) => {
     localStorage.removeItem("userRole");
     localStorage.removeItem("authUser");
     localStorage.removeItem("token");
+    localStorage.removeItem("company_id");
   };
 
   return (

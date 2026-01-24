@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import './OJT.scss';
+import { useSearchParams } from "react-router-dom";
 
 import ojtDocumentApi from '../../API/OjtDocumentAPI';
 import semesterApi from '../../API/SemesterAPI';
@@ -13,6 +14,9 @@ export default function OJT() {
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState('');
 	const [activeSemester, setActiveSemester] = useState(null);
+	const [search, setSearch] = useState('');
+	const [tagType, setTagType] = useState(null); // default
+	const [searchParams, setSearchParams] = useSearchParams();
 
 	const [activeDoc, setActiveDoc] = useState(null);
 	const [numPages, setNumPages] = useState(null);
@@ -190,7 +194,10 @@ export default function OJT() {
 				if (cancelled) return;
 				setActiveSemester(activeSem);
 
-				const res = await ojtDocumentApi.getAll();
+				const res = tagType
+					? await ojtDocumentApi.getByTagType(tagType)
+					: await ojtDocumentApi.getAll();
+
 				const list = res?.data?.data || [];
 				const normalized = (Array.isArray(list) ? list : [])
 					.filter((d) => !!d?.isGeneral) // public OJT Docs only shows general documents
@@ -232,7 +239,7 @@ export default function OJT() {
 		return () => {
 			cancelled = true;
 		};
-	}, []);
+	}, [tagType]);
 
 	const openDoc = (doc) => {
 		const activeSemesterId = getActiveSemesterId(activeSemester);
@@ -256,6 +263,16 @@ export default function OJT() {
 		// When switching documents, retry PDF preview.
 		resetPdfState();
 	}, [activeDoc?.id]);
+	useEffect(() => {
+  const tagFromUrl = searchParams.get("tag");
+
+  // chỉ set nếu hợp lệ
+  if (["company", "university", "system"].includes(tagFromUrl)) {
+    setTagType(tagFromUrl);
+  } else {
+    setTagType(null); // getAll
+  }
+}, [searchParams]);
 
 	useEffect(() => {
 		let cancelled = false;
@@ -518,6 +535,43 @@ export default function OJT() {
 						</span>
 					) : null}
 				</h2>
+				<input
+					type="text"
+					className="ojt-search"
+					placeholder="Tìm tài liệu..."
+					value={search}
+					onChange={(e) => setSearch(e.target.value)}
+				/>
+				<div className="ojt-tag-filter">
+				<button
+  className={tagType === 'company' ? 'active' : ''}
+  onClick={() =>
+    setTagType(prev => (prev === 'company' ? null : 'company'))
+  }
+>
+  Company
+</button>
+
+<button
+  className={tagType === 'university' ? 'active' : ''}
+  onClick={() =>
+    setTagType(prev => (prev === 'university' ? null : 'university'))
+  }
+>
+  University
+</button>
+
+<button
+  className={tagType === 'system' ? 'active' : ''}
+  onClick={() =>
+    setTagType(prev => (prev === 'system' ? null : 'system'))
+  }
+>
+  System
+</button>
+
+</div>
+
 				{loading ? (
 					<div className="ojt-loading">Đang tải tài liệu...</div>
 				) : error ? (
@@ -526,15 +580,22 @@ export default function OJT() {
 					<div className="ojt-loading">Không có tài liệu.</div>
 				) : (
 				<ul className="ojt-doc-list">
-					{docs.map(d => (
-						<li key={d.id}>
-							<button
-								className={`doc-btn ${activeDoc?.id === d.id ? 'active' : ''}`}
-								onClick={() => openDoc(d)}
-							>{d.title}</button>
-						</li>
+	{docs
+		.filter(d =>
+			d.title.toLowerCase().includes(search.toLowerCase())
+		)
+		.map(d => (
+			<li key={d.id}>
+				<button
+					className={`doc-btn ${activeDoc?.id === d.id ? 'active' : ''}`}
+					onClick={() => openDoc(d)}
+				>
+					{d.title}
+				</button>
+			</li>
 					))}
 				</ul>
+
 				)}
 				{!!activeDoc && (
 					<div className="ojt-nav">
@@ -600,6 +661,7 @@ export default function OJT() {
 							allow="autoplay"
 						/>
 					) : (
+						<div className="ojt-pdf-wrapper">
 						<Document
 							file={pdfFile || activeDoc.url}
 							onLoadSuccess={onLoadSuccess}
@@ -616,6 +678,7 @@ export default function OJT() {
 								scale={1.4}
 							/>
 						</Document>
+						</div>
 					)
 				)}
 			</div>
