@@ -4,6 +4,8 @@ import userApi from '../../API/UserAPI';
 import majorApi from '../../API/MajorAPI';
 import { useAuth } from '../../Hook/useAuth';
 import { pickAvatarUrl } from '../../lib/utils.jsx';
+import { Modal } from 'antd';
+import { ExclamationCircleOutlined } from '@ant-design/icons';
 
 const UserManager = () => {
   const { authUser } = useAuth();
@@ -28,6 +30,8 @@ const UserManager = () => {
 
   const [editingUser, setEditingUser] = useState(null);
   const [editSaving, setEditSaving] = useState(false);
+  const [statusSaving, setStatusSaving] = useState(false);
+  const [statusConfirm, setStatusConfirm] = useState({ open: false, userId: 0, nextStatus: 'active' });
   const [avatarInputKey, setAvatarInputKey] = useState(0);
   const [editAvatarPreviewUrl, setEditAvatarPreviewUrl] = useState('');
   const [editAvatarPreviewIsObjectUrl, setEditAvatarPreviewIsObjectUrl] = useState(false);
@@ -36,6 +40,7 @@ const UserManager = () => {
     studentCode: '',
     dob: '',
     phone: '',
+    role: '',
     majorId: '',
     companyId: '',
     password: '',
@@ -43,6 +48,38 @@ const UserManager = () => {
     cvFile: null,
   });
   const [editInitial, setEditInitial] = useState(null);
+
+  const isAdmin = useMemo(() => {
+    const raw = String(authUser?.role ?? authUser?.Role ?? '').trim().toLowerCase();
+    return raw === 'admin';
+  }, [authUser]);
+
+  const isRoleLockedByMajor = (u) => {
+    const raw = u?.majorId;
+    if (raw == null) return false;
+    const s = String(raw).trim();
+    return s !== '' && s !== '0';
+  };
+
+  const normalizeRoleValue = (value) => {
+    const raw = String(value ?? '').trim();
+    if (!raw) return '';
+    const lower = raw.toLowerCase();
+    if (lower === 'admin') return 'admin';
+    if (lower === 'student') return 'student';
+    if (lower === 'company') return 'company';
+    if (lower === 'cro_staff' || lower === 'cro staff' || lower === 'crostaff') return 'cro_staff';
+    return '';
+  };
+
+  const roleOptions = useMemo(() => {
+    return [
+      { value: 'admin', label: 'Admin' },
+      { value: 'student', label: 'Student' },
+      { value: 'cro_staff', label: 'CRO Staff' },
+      { value: 'company', label: 'Company' },
+    ];
+  }, []);
 
   const [query, setQuery] = useState('');
   const [majorFilter, setMajorFilter] = useState('');
@@ -166,31 +203,74 @@ const UserManager = () => {
     URL.revokeObjectURL(url);
   };
 
-  const handleDelete = async (userId) => {
-    const targetId = Number(userId) || 0;
-    if (currentUserId && targetId && currentUserId === targetId) {
-      window.alert("You can't delete the account you're currently using.");
+  const getAccountStatus = (u) => {
+    const raw = u?.accountStatus ?? u?.AccountStatus ?? u?.status ?? u?.Status;
+    const s = String(raw ?? '').trim().toLowerCase();
+    if (s === 'inactive' || s === 'disabled' || s === 'deactive' || s === 'deactivated') return 'inactive';
+    if (s === 'active') return 'active';
+    // Default to active if backend doesn't return a status.
+    return 'active';
+  };
+
+  const handleToggleStatus = (u) => {
+    const targetId = Number(u?.userId) || 0;
+    if (!targetId) return;
+
+    if (currentUserId && targetId === Number(currentUserId)) {
+      window.alert("You can't deactivate the account you're currently using.");
       return;
     }
 
-    const ok = window.confirm('Delete this user?');
-    if (!ok) return;
+    const current = getAccountStatus(u);
+    const next = current === 'active' ? 'inactive' : 'active';
+    setStatusConfirm({ open: true, userId: targetId, nextStatus: next });
+  };
+
+  const closeStatusConfirm = () => {
+    if (statusSaving) return;
+    setStatusConfirm({ open: false, userId: 0, nextStatus: 'active' });
+  };
+
+  const confirmToggleStatus = async () => {
+    const targetId = Number(statusConfirm.userId) || 0;
+    if (!targetId) {
+      closeStatusConfirm();
+      return;
+    }
+
+    setStatusSaving(true);
     try {
-      await userApi.deleteById(targetId);
-      setUsers((prev) => prev.filter((u) => Number(u?.userId) !== targetId));
+      await userApi.updateStatus({ userId: targetId, accountStatus: statusConfirm.nextStatus });
+      setUsers((prev) =>
+        prev.map((x) =>
+          Number(x?.userId) === targetId
+            ? { ...x, accountStatus: statusConfirm.nextStatus, AccountStatus: statusConfirm.nextStatus }
+            : x
+        )
+      );
+      // Re-fetch so the table matches what the backend persisted.
+      await refreshUsers();
+      closeStatusConfirm();
     } catch (e) {
-      window.alert(e?.response?.data?.message || e?.message || 'Delete failed');
+      window.alert(e?.response?.data?.message || e?.message || 'Update status failed');
+    } finally {
+      setStatusSaving(false);
     }
   };
+
+  // Delete is intentionally disabled in UI; replaced by activate/deactivate.
 
   const openEdit = (u) => {
     setEditingUser(u);
     setAvatarInputKey((k) => k + 1);
+
+    const initialRole = normalizeRoleValue(u?.role ?? u?.Role ?? getRoleLabel(u));
     const initial = {
       fullname: u?.fullname ?? '',
       studentCode: u?.studentCode ?? '',
       dob: u?.dob ? String(u.dob).slice(0, 10) : '',
       phone: u?.phone ?? '',
+      role: initialRole,
       majorId: u?.majorId != null ? String(u.majorId) : '',
       companyId: u?.companyId != null ? String(u.companyId) : '',
     };
@@ -221,6 +301,7 @@ const UserManager = () => {
       studentCode: '',
       dob: '',
       phone: '',
+      role: '',
       majorId: '',
       companyId: '',
       password: '',
@@ -280,6 +361,33 @@ const UserManager = () => {
     appendIfChangedText('StudentCode', editForm.studentCode, editInitial?.studentCode);
     appendIfChangedText('Dob', editForm.dob, editInitial?.dob);
     appendIfChangedText('Phone', editForm.phone, editInitial?.phone);
+
+    // Admin-only: allow changing role among supported values.
+    const nextRole = normalizeRoleValue(editForm.role);
+    const prevRole = String(editInitial?.role ?? '');
+    const roleLocked = isRoleLockedByMajor(editingUser);
+    const roleChanged = Boolean(isAdmin && nextRole && nextRole !== prevRole && !roleLocked);
+    if (isAdmin && nextRole && !roleLocked) {
+      appendIfChangedText('Role', nextRole, editInitial?.role);
+
+      // IMPORTANT: backend can reject role changes when incompatible fields remain.
+      // Example: changing a student (has MajorId) into company/admin/cro_staff.
+      // We clear foreign keys that don't apply to the selected role.
+      if (roleChanged) {
+        if (nextRole === 'student') {
+          // Students should not be tied to a company.
+          fd.append('CompanyId', '');
+        } else if (nextRole === 'company') {
+          // Companies should not have a major.
+          fd.append('MajorId', '');
+        } else {
+          // Admin/CRO staff: clear both.
+          fd.append('MajorId', '');
+          fd.append('CompanyId', '');
+        }
+      }
+    }
+
     appendIfChangedInt('MajorId', editForm.majorId, editInitial?.majorId);
     appendIfChangedInt('CompanyId', editForm.companyId, editInitial?.companyId);
 
@@ -485,6 +593,7 @@ const UserManager = () => {
               filteredUsers.map((u) => {
                 const majorName = u?.majorId != null ? (majorMap.get(Number(u.majorId)) || String(u.majorId)) : '-';
                 const roleName = getRoleLabel(u);
+                const status = getAccountStatus(u);
                 const isSelf = currentUserId && Number(u?.userId) === Number(currentUserId);
                 return (
                   <tr key={u.userId}>
@@ -513,13 +622,13 @@ const UserManager = () => {
                           Edit
                         </button>
                         <button
-                          className="btn-danger"
+                          className={status === 'active' ? 'btn-danger' : 'btn-secondary'}
                           type="button"
-                          onClick={() => handleDelete(u.userId)}
+                          onClick={() => handleToggleStatus(u)}
                           disabled={isSelf}
-                          title={isSelf ? "You can't delete your own account." : 'Delete user'}
+                          title={isSelf ? "You can't change your own status." : (status === 'active' ? 'Deactivate user' : 'Activate user')}
                         >
-                          Delete
+                          {status === 'active' ? 'Deactivate' : 'Activate'}
                         </button>
                       </div>
                     </td>
@@ -529,6 +638,29 @@ const UserManager = () => {
             )}
           </tbody>
         </table>
+
+        <Modal
+          open={statusConfirm.open}
+          centered
+          confirmLoading={statusSaving}
+          title={
+            <span style={{ display: 'inline-flex', alignItems: 'center', gap: 8 }}>
+              <ExclamationCircleOutlined />
+              {statusConfirm.nextStatus === 'inactive' ? 'Deactivate this user?' : 'Activate this user?'}
+            </span>
+          }
+          okText={statusConfirm.nextStatus === 'inactive' ? 'Deactivate' : 'Activate'}
+          cancelText="Cancel"
+          okButtonProps={statusConfirm.nextStatus === 'inactive' ? { danger: true } : undefined}
+          onOk={confirmToggleStatus}
+          onCancel={closeStatusConfirm}
+          maskClosable={!statusSaving}
+          keyboard={!statusSaving}
+        >
+          {statusConfirm.nextStatus === 'inactive'
+            ? 'This user will not be able to log in until you reactivate them.'
+            : 'This user will regain access to the system.'}
+        </Modal>
 
         {editingUser && (
           <div className="modal-backdrop" role="dialog" aria-modal="true">
@@ -560,6 +692,25 @@ const UserManager = () => {
                   <label>
                     Phone
                     <input value={editForm.phone} onChange={(e) => setField('phone', e.target.value)} />
+                  </label>
+
+                  <label>
+                    Role
+                    <select
+                      value={editForm.role}
+                      onChange={(e) => setField('role', e.target.value)}
+                      disabled={!isAdmin || isRoleLockedByMajor(editingUser)}
+                      title={
+                        !isAdmin
+                          ? 'Only admin can change role'
+                          : (isRoleLockedByMajor(editingUser) ? 'Role is locked because this user already has a major' : 'Change role')
+                      }
+                    >
+                      <option value="">(no change)</option>
+                      {roleOptions.map((opt) => (
+                        <option key={opt.value} value={opt.value}>{opt.label}</option>
+                      ))}
+                    </select>
                   </label>
 
                   <label>

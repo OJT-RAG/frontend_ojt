@@ -14,6 +14,17 @@ const userApi = {
   // Not listed in the provided spec, but used by existing UI.
   update: (data) => httpClient.put("/user/update", data),
 
+  // Swagger: PUT /api/user/update-status
+  // Body: { userId: number, accountStatus: "active" | "inactive" }
+  updateStatus: ({ userId, accountStatus }) =>
+    httpClient.put("/user/update-status", {
+      userId,
+      accountStatus,
+      // Aliases for case-sensitive/backends expecting PascalCase
+      UserId: userId,
+      AccountStatus: accountStatus,
+    }),
+
   // Student apply a job position (stores JobPositionId/SemesterId on the user).
   // Uses the same update endpoint the app already relies on.
   applyJobPosition: ({ userId, jobPositionId, semesterId }) => {

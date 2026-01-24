@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useLocation, useNavigate } from "react-router-dom";
+import { Modal, notification } from "antd";
 import { useI18n } from "../../i18n/i18n.jsx";
 import { useAuth } from "../Hook/useAuth.jsx";
 import "./Login.scss";
@@ -17,8 +18,82 @@ function Login() {
   const [googleReady, setGoogleReady] = useState(false);
 
   const navigate = useNavigate();
+  const location = useLocation();
   const { t } = useI18n();
   const { login } = useAuth();
+
+  const deactivatedPopupShownRef = useRef(false);
+
+  useEffect(() => {
+    const reason = location?.state?.reason;
+    if (reason !== 'deactivated') return;
+    if (deactivatedPopupShownRef.current) return;
+    deactivatedPopupShownRef.current = true;
+
+    Modal.warning({
+      title: 'Account deactivated',
+      content: t('login_account_deactivated'),
+      okText: 'OK',
+      centered: true,
+    });
+    // Also show inline error message on the form.
+    setError(t('login_account_deactivated'));
+  }, [location?.state, t]);
+
+  const isInactiveAccount = (user) => {
+    const raw = user?.accountStatus ?? user?.AccountStatus ?? user?.status ?? user?.Status;
+    const s = String(raw ?? '').trim().toLowerCase();
+    return s === 'inactive' || s === 'disabled' || s === 'deactive' || s === 'deactivated';
+  };
+
+  const isInactiveMessage = (msg) => {
+    const s = String(msg ?? '').toLowerCase().trim();
+    if (!s) return false;
+
+    // English keywords
+    if (s.includes('inactive') || s.includes('disabled') || s.includes('deactive') || s.includes('deactivated')) return true;
+
+    // Vietnamese keywords (common phrasing)
+    if (s.includes('vô hiệu hóa') || s.includes('vo hieu hoa')) return true;
+    if ((s.includes('bị khóa') || s.includes('bi khoa') || s.includes('tạm khóa') || s.includes('tam khoa')) && (s.includes('tài khoản') || s.includes('tai khoan') || s.includes('account'))) {
+      return true;
+    }
+
+    // Some backends incorrectly return a generic login system error for deactivated accounts
+    if (s.includes('lỗi hệ thống khi đăng nhập') || s.includes('loi he thong khi dang nhap')) return true;
+
+    return false;
+  };
+
+  const getLoginErrorInfo = (err) => {
+    const status = err?.response?.status;
+    const data = err?.response?.data;
+
+    const message =
+      typeof data === 'string'
+        ? data
+        : typeof data?.message === 'string'
+          ? data.message
+          : typeof data?.title === 'string'
+            ? data.title
+            : err?.message || 'Login failed';
+
+    const code = String(data?.code ?? data?.errorCode ?? data?.error_code ?? data?.key ?? '').toLowerCase();
+    const accountStatus = String(
+      data?.accountStatus ?? data?.AccountStatus ?? data?.status ?? data?.Status ?? data?.data?.accountStatus ?? ''
+    ).toLowerCase();
+
+    const isInactive =
+      isInactiveMessage(message) ||
+      isInactiveMessage(code) ||
+      accountStatus === 'inactive' ||
+      accountStatus === 'disabled' ||
+      accountStatus === 'deactive' ||
+      accountStatus === 'deactivated' ||
+      status === 423;
+
+    return { status, data, message, isInactive };
+  };
 
   const googleClientId = useMemo(() => {
     return process.env.REACT_APP_GOOGLE_CLIENT_ID || appConfig?.googleClientId;
@@ -130,6 +205,12 @@ function Login() {
       const res = await userApi.googleLogin({ idToken: credential });
       const { token, user } = normalizeGoogleLoginResponse(res);
 
+      if (isInactiveAccount(user)) {
+        setError(t('login_account_deactivated'));
+        setNotice('');
+        return;
+      }
+
       const jwtPayload = decodeJwtPayload(credential);
 
       const role = String(user?.role || jwtPayload?.role || "student").toLowerCase();
@@ -160,7 +241,13 @@ login(role, authUser, token);
       navigate("/", { replace: true });
     } catch (err) {
       console.error("Google login error:", err);
-      setError(getAxiosErrorMessage(err));
+      const msg = getAxiosErrorMessage(err);
+      if (isInactiveMessage(msg)) {
+        setError(t('login_account_deactivated'));
+        setNotice('');
+      } else {
+        setError(msg);
+      }
     } finally {
       setLoading(false);
     }
@@ -252,9 +339,13 @@ login(role, authUser, token);
 
       return { success: false, message: "Login failed" };
     } catch (err) {
+      const info = getLoginErrorInfo(err);
       return {
         success: false,
-        message: err?.response?.data?.message || err?.message || "Login failed",
+        message: info.message,
+        status: info.status,
+        data: info.data,
+        isInactive: info.isInactive,
       };
     }
   };
@@ -269,7 +360,18 @@ login(role, authUser, token);
     setLoading(false);
 
     if (!result.success) {
+      if (result.isInactive || isInactiveMessage(result.message)) {
+        setError(t('login_account_deactivated'));
+        setNotice('');
+        return;
+      }
       setError(result.message);
+      return;
+    }
+
+    if (isInactiveAccount(result.user)) {
+      setError(t('login_account_deactivated'));
+      setNotice('');
       return;
     }
 

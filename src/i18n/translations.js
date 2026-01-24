@@ -131,6 +131,7 @@ export const translations = {
     create_account: 'Create account',
     login_google_success: 'Logged in successfully with Google.',
     login_google_failed: 'Google login failed. Please try again.',
+    login_account_deactivated: 'Your account has been deactivated by an administrator. Please contact Admin for more information.',
 
     // SignUp
     signup_title: 'Create account',
@@ -402,6 +403,7 @@ export const translations = {
     create_account: 'Tạo tài khoản',
     login_google_success: 'Đăng nhập Google thành công.',
     login_google_failed: 'Đăng nhập Google thất bại. Vui lòng thử lại.',
+    login_account_deactivated: 'Tài khoản của bạn đã bị Admin vô hiệu hóa. Vui lòng liên hệ Admin để biết thêm thông tin.',
 
     signup_title: 'Tạo tài khoản',
     full_name: 'Họ và tên',
@@ -655,6 +657,7 @@ export const translations = {
     create_account: 'アカウント作成',
     login_google_success: 'Googleでのログインに成功しました。',
     login_google_failed: 'Googleログインに失敗しました。もう一度お試しください。',
+    login_account_deactivated: '管理者によりアカウントが無効化されています。詳細は管理者へお問い合わせください。',
 
     signup_title: 'アカウント作成',
     full_name: '氏名',

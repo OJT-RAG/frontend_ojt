@@ -19,6 +19,7 @@ import StaffsLayout from './component/Staffs/StaffsLayout.jsx';
 import Footer from './component/homepage/Footer.jsx';
 import Staffchat from './component/AIchatbot/chat/StaffChatPage.jsx';
 import ChatStaffRoom from './component/AIchatbot/chat/StaffChatRoom.jsx';
+import AccountStatusWatcher from './component/Hook/AccountStatusWatcher.jsx';
 
 function RequireAuth({ children, allowedRoles }) {
   const { role } = useAuth();
@@ -44,6 +45,7 @@ function RequireAuth({ children, allowedRoles }) {
 function App() {
   return (
     <Router>
+      <AccountStatusWatcher />
       <Header />
       <Routes>
         <Route path="/" element={<HomePage />} />
