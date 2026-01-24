@@ -48,6 +48,8 @@ const JobManagement = ({ variant = "company" }) => {
 
   const showTabs = variant === "admin";
   const positionsReadOnly = variant === "admin";
+  const titlesReadOnly = variant === "admin";
+  const descriptionsReadOnly = variant === "admin";
 
   const [activeTab, setActiveTab] = useState("positions");
 
@@ -318,12 +320,20 @@ const JobManagement = ({ variant = "company" }) => {
   // -------------------------
 
   const openCreateModal = () => {
+    if (titlesReadOnly) {
+      messageApi.info("Admin can only view job titles");
+      return;
+    }
     setEditData(null);
     form.resetFields();
     setIsModalOpen(true);
   };
 
   const openEditModal = (record) => {
+    if (titlesReadOnly) {
+      messageApi.info("Admin can only view job titles");
+      return;
+    }
     setEditData(record);
     form.setFieldsValue(record);
     setIsModalOpen(true);
@@ -331,6 +341,10 @@ const JobManagement = ({ variant = "company" }) => {
 
   const handleSubmit = async () => {
     try {
+      if (titlesReadOnly) {
+        messageApi.error("Admin cannot create/update job titles");
+        return;
+      }
       const values = await form.validateFields();
 
       if (editData) {
@@ -498,6 +512,10 @@ const JobManagement = ({ variant = "company" }) => {
   };
 
   const openCreateDescriptionModal = () => {
+    if (descriptionsReadOnly) {
+      messageApi.info("Admin can only view job descriptions");
+      return;
+    }
     setIsDescModalOpen(true);
     setDescEditJob(null);
     setDescExistingRecord(null);
@@ -505,6 +523,10 @@ const JobManagement = ({ variant = "company" }) => {
   };
 
   const openEditDescriptionModal = (record) => {
+    if (descriptionsReadOnly) {
+      messageApi.info("Admin can only view job descriptions");
+      return;
+    }
     const jobPositionId = record?.jobPositionId ?? record?.jobPositionID ?? record?.jobPositionid;
     const text = record?.jobDescription ?? record?.description ?? record?.jobDesc ?? record?._text ?? "";
     setIsDescModalOpen(true);
@@ -521,6 +543,10 @@ const JobManagement = ({ variant = "company" }) => {
 
   const handleSubmitDescription = async () => {
     try {
+      if (descriptionsReadOnly) {
+        messageApi.error("Admin cannot create/update job descriptions");
+        return;
+      }
       setDescLoading(true);
       const values = await descForm.validateFields();
       const existingRecord =
@@ -565,6 +591,10 @@ const JobManagement = ({ variant = "company" }) => {
 
   const handleDeleteDescription = async (record) => {
     try {
+      if (descriptionsReadOnly) {
+        messageApi.error("Admin cannot delete job descriptions");
+        return;
+      }
       const id =
         record?.jobDescriptionId ??
         record?.jobDescriptionID ??
@@ -588,6 +618,10 @@ const JobManagement = ({ variant = "company" }) => {
 
   const handleDelete = async (id) => {
     try {
+      if (titlesReadOnly) {
+        messageApi.error("Admin cannot delete job titles");
+        return;
+      }
       await jobApi.delete(id);
       fetchJobs();
     } catch (err) {
@@ -607,7 +641,10 @@ const JobManagement = ({ variant = "company" }) => {
         return positionCountByJobTitle[title] ?? record?.positionAmount ?? 0;
       },
     },
-    {
+  ];
+
+  if (!titlesReadOnly) {
+    columns.push({
       title: "Actions",
       key: "actions",
       width: 180,
@@ -635,8 +672,8 @@ const JobManagement = ({ variant = "company" }) => {
           </Popconfirm>
         </div>
       ),
-    },
-  ];
+    });
+  }
 
   const getMajorTitle = (majorId) => majors.find((m) => m.majorId === majorId)?.majorTitle || "-";
   const getSemesterName = (semesterId) =>
@@ -852,7 +889,10 @@ const JobManagement = ({ variant = "company" }) => {
         return <span title={text}>{text.length > 80 ? `${text.slice(0, 80)}…` : text}</span>;
       },
     },
-    {
+  ];
+
+  if (!descriptionsReadOnly) {
+    descriptionColumns.push({
       title: "Actions",
       key: "actions",
       width: 220,
@@ -879,8 +919,8 @@ const JobManagement = ({ variant = "company" }) => {
           </Popconfirm>
         </div>
       ),
-    },
-  ];
+    });
+  }
 
   return (
     <>
@@ -952,14 +992,16 @@ const JobManagement = ({ variant = "company" }) => {
                       />
 
                       <div className="job-header-buttons">
-                        <Button
-                          className="job-create-btn"
-                          type="primary"
-                          icon={<Plus size={16} />}
-                          onClick={openCreateModal}
-                        >
-                          Create
-                        </Button>
+                        {!titlesReadOnly && (
+                          <Button
+                            className="job-create-btn"
+                            type="primary"
+                            icon={<Plus size={16} />}
+                            onClick={openCreateModal}
+                          >
+                            Create
+                          </Button>
+                        )}
 
                         <Button
                           className="job-refresh-btn"
@@ -995,14 +1037,16 @@ const JobManagement = ({ variant = "company" }) => {
                       />
 
                       <div className="job-header-buttons">
-                        <Button
-                          className="job-create-btn"
-                          type="primary"
-                          icon={<Plus size={16} />}
-                          onClick={openCreateDescriptionModal}
-                        >
-                          Create
-                        </Button>
+                        {!descriptionsReadOnly && (
+                          <Button
+                            className="job-create-btn"
+                            type="primary"
+                            icon={<Plus size={16} />}
+                            onClick={openCreateDescriptionModal}
+                          >
+                            Create
+                          </Button>
+                        )}
 
                         <Button
                           className="job-refresh-btn"
@@ -1079,6 +1123,7 @@ const JobManagement = ({ variant = "company" }) => {
         onCancel={() => setIsModalOpen(false)}
         onOk={handleSubmit}
         okText={editData ? "Update" : "Create"}
+        okButtonProps={{ disabled: titlesReadOnly }}
       >
         <Form layout="vertical" form={form}>
           <Form.Item
@@ -1219,6 +1264,7 @@ const JobManagement = ({ variant = "company" }) => {
         onOk={handleSubmitDescription}
         okText="Save"
         confirmLoading={descLoading}
+        okButtonProps={{ disabled: descriptionsReadOnly }}
       >
         <Form layout="vertical" form={descForm}>
           <Form.Item
