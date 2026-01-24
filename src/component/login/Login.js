@@ -201,8 +201,6 @@ login(role, authUser, token);
           client_id: googleClientId,
 
           callback: (response) => {
-            //console.log("=== GOOGLE RESPONSE ===", response);
-           console.log("=== ID TOKEN ===", response?.credential);
 
             handleGoogleCredential(response?.credential);
           },
