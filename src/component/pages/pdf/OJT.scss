@@ -9,8 +9,8 @@
 }
 
 .ojt-sidebar {
-	width: 300px;
-	flex: 0 0 300px;
+	width: 400px;
+	flex: 0 0 400px;	
 	padding: 1.1rem 1rem 1.5rem;
 	background: #ffffff;
 	border-right: 1px solid #e2e8f0;
@@ -186,4 +186,57 @@
 	.pg-controls {
 		flex: 1;
 	}
+}
+.ojt-search {
+	width: 100%;
+	padding: 8px 10px;
+	margin: 10px 0 12px;
+	border-radius: 6px;
+	border: 1px solid #ddd;
+	font-size: 14px;
+}
+.ojt-pdf-wrapper {
+  max-height: calc(100vh - 140px);
+  max-width: 820px;        /* 👈 QUAN TRỌNG: khóa độ rộng */
+  width: 100%;
+  margin: 0 auto;          /* 👈 luôn ở giữa */
+  overflow: auto;
+  display: flex;
+  justify-content: center;
+}
+
+.ojt-tag-filter {
+  display: flex;
+  gap: 8px;
+  flex-wrap: nowrap;       /* 👈 luôn 1 hàng */
+}
+
+.ojt-tag-filter button {
+  flex: 1;                 /* 👈 chia đều */
+  white-space: nowrap;
+}
+.ojt-tag-filter button {
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  color: #0f172a;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.18s ease;
+}
+
+/* hover */
+.ojt-tag-filter button:hover {
+  background: #eef2ff;
+  border-color: #c7d2fe;
+}
+
+/* 🔥 ACTIVE STATE */
+.ojt-tag-filter button.active {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: #ffffff;
+  border-color: #1d4ed8;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.25);
+  transform: translateY(-1px);
 }
