@@ -79,10 +79,18 @@ function Login() {
       return true;
     }
 
-    // Some backends incorrectly return a generic login system error for deactivated accounts
-    // NOTE: We intentionally do NOT treat this as deactivated for 400/401 (invalid credentials)
-    // and only use it as a weak signal elsewhere.
+    return false;
+  };
+
+  const isBackendGenericLoginFailureMessage = (msg) => {
+    const s = String(msg ?? '').toLowerCase().trim();
+    if (!s) return false;
+
+    // Observed backend behavior: sometimes returns 500 with this message for invalid credentials.
     if (s.includes('lỗi hệ thống khi đăng nhập') || s.includes('loi he thong khi dang nhap')) return true;
+
+    // Very generic English variants.
+    if (s === 'login failed' || s.includes('login failed')) return true;
 
     return false;
   };
@@ -130,6 +138,8 @@ function Login() {
   const getLoginErrorInfo = (err) => {
     const status = err?.response?.status;
     const data = err?.response?.data;
+    const requestUrl = String(err?.config?.url ?? err?.request?.responseURL ?? '').toLowerCase();
+    const isLoginEndpoint = requestUrl.includes('/user/login');
 
     const message =
       typeof data === 'string'
@@ -145,24 +155,29 @@ function Login() {
       data?.accountStatus ?? data?.AccountStatus ?? data?.status ?? data?.Status ?? data?.data?.accountStatus ?? ''
     ).toLowerCase();
 
+    const isServerError = typeof status === 'number' && status >= 500;
+
     const isInvalidCredentials =
       status === 400 ||
       status === 401
         ? isInvalidCredentialsMessage(message) || isInvalidCredentialsMessage(code) || true
-        : isInvalidCredentialsMessage(message) || isInvalidCredentialsMessage(code);
+        : (isInvalidCredentialsMessage(message) || isInvalidCredentialsMessage(code)) ||
+          // Some backends incorrectly respond 500 for invalid credentials on the login endpoint.
+          (isServerError && isLoginEndpoint && isBackendGenericLoginFailureMessage(message));
 
-    // If the server replied 400/401, it is almost always invalid credentials.
-    // Never label these as "deactivated".
-    const ignoreInactiveHeuristics = status === 400 || status === 401;
-
-    const isInactive =
-      (!ignoreInactiveHeuristics && isInactiveMessage(message)) ||
-      (!ignoreInactiveHeuristics && isInactiveMessage(code)) ||
+    // Only treat as inactive when we have strong, explicit signals.
+    // Never infer inactive from heuristics for 5xx errors.
+    const hasExplicitInactiveStatus =
       accountStatus === 'inactive' ||
       accountStatus === 'disabled' ||
       accountStatus === 'deactive' ||
       accountStatus === 'deactivated' ||
       status === 423;
+
+    const canUseInactiveHeuristics = status !== 400 && status !== 401 && !isServerError;
+    const isInactive =
+      hasExplicitInactiveStatus ||
+      (canUseInactiveHeuristics && (isInactiveMessage(message) || isInactiveMessage(code)));
 
     return { status, data, message, isInactive, isInvalidCredentials };
   };
@@ -433,14 +448,17 @@ login(role, authUser, token);
     setLoading(false);
 
     if (!result.success) {
-      if (result.isInactive || isInactiveMessage(result.message)) {
-        setError(t('login_account_deactivated'));
+      if (result.isInvalidCredentials) {
+        setError(t('login_invalid_credentials') || 'Wrong username or password.');
         setNotice('');
         return;
       }
 
-      if (result.isInvalidCredentials) {
-        setError(t('login_invalid_credentials') || 'Wrong username or password.');
+      // Only show "account deactivated" when the backend explicitly indicates it.
+      // Do not let heuristic message matching override invalid-credential responses.
+      const canUseInactiveHeuristics = result.status !== 400 && result.status !== 401;
+      if (result.isInactive || (canUseInactiveHeuristics && isInactiveMessage(result.message))) {
+        setError(t('login_account_deactivated'));
         setNotice('');
         return;
       }
