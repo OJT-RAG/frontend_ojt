@@ -46,6 +46,21 @@ const resolveJobDescriptionText = (item) => {
   );
 };
 
+const sortByJobPositionIdAsc = (list) => {
+  const arr = Array.isArray(list) ? [...list] : [];
+  arr.sort((a, b) => {
+    const aId = Number(a?.jobPositionId ?? a?.jobPositionID ?? a?.jobPositionid);
+    const bId = Number(b?.jobPositionId ?? b?.jobPositionID ?? b?.jobPositionid);
+    const aOk = Number.isFinite(aId);
+    const bOk = Number.isFinite(bId);
+    if (aOk && bOk) return aId - bId;
+    if (aOk) return -1;
+    if (bOk) return 1;
+    return 0;
+  });
+  return arr;
+};
+
 
 export default function StudentJobsPage() {
   const [messageApi, contextHolder] = message.useMessage();
@@ -143,7 +158,7 @@ export default function StudentJobsPage() {
       ]);
 
       const list = posRes?.data?.data || [];
-      setRows(list);
+      setRows(sortByJobPositionIdAsc(list));
       setMajors(majorRes?.data?.data || []);
       setSemesters(semesterRes?.data?.data || []);
       setCompanies(companyRes?.data?.data || []);
@@ -283,9 +298,9 @@ export default function StudentJobsPage() {
       list = list.filter((jp) => !!bookmarkByJobPositionId[jp?.jobPositionId]);
     }
 
-    if (!q) return list;
+    if (!q) return sortByJobPositionIdAsc(list);
 
-    return list.filter((jp) => {
+    const filtered = list.filter((jp) => {
       const title = (jp?.jobTitle || "").toLowerCase();
       const location = (jp?.location || "").toLowerCase();
       const salary = (jp?.salaryRange || "").toLowerCase();
@@ -301,6 +316,7 @@ export default function StudentJobsPage() {
         desc.includes(q)
       );
     });
+    return sortByJobPositionIdAsc(filtered);
   }, [rows, query, majorTitleById, semesterNameById, descriptionsByJobPositionId, showBookmarkedOnly, bookmarkByJobPositionId]);
 
   const toggleBookmark = async (record) => {
@@ -364,6 +380,16 @@ export default function StudentJobsPage() {
   }
 
   const jobPositionId = record?.jobPositionId;
+
+  // Disallow applying when the position is full.
+  const desc = descriptionsByJobPositionId?.[jobPositionId];
+  const hireQuantity = Number(desc?.hireQuantity ?? 0);
+  const appliedQuantity = Number(desc?.appliedQuantity ?? 0);
+  const isFull = hireQuantity > 0 && appliedQuantity >= hireQuantity;
+  if (isFull) {
+    messageApi.warning("This job position is full.");
+    return;
+  }
 
   const existing = applicationByJobPositionId[jobPositionId];
   if (existing?.status) {
@@ -509,8 +535,13 @@ export default function StudentJobsPage() {
   render: (_, record) => {
     const app = applicationByJobPositionId[record?.jobPositionId];
     const status = app?.status;
+    const desc = descriptionsByJobPositionId?.[record?.jobPositionId];
+    const hireQuantity = Number(desc?.hireQuantity ?? 0);
+    const appliedQuantity = Number(desc?.appliedQuantity ?? 0);
+    const isFull = hireQuantity > 0 && appliedQuantity >= hireQuantity;
+
     const disabled =
-      !record?.isActive || applyingId === record.jobPositionId || !!status;
+      !record?.isActive || isFull || applyingId === record.jobPositionId || !!status;
 
     return (
       <div style={{ display: "flex", gap: 8, alignItems: "center" }}>

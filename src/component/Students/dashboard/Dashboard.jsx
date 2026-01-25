@@ -1,7 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useLocation } from "react-router-dom";
 import Sidebar from "./Sidebar.jsx";
-import PdfManager from "../../pages/pdf/pdfManager.jsx";
 import FinalReportPage from "../StudentsReport/FinalReportPage.jsx";
 import UpdateUserPage from "../userProfile/UpdateUserPage.jsx";
 import StudentJobsPage from "../jobs/StudentJobsPage.jsx";
@@ -11,8 +10,8 @@ import "./Dashboard.css";
 const Dashboard = () => {
   const location = useLocation();
 
-  // Mặc định module PDF active
-  const [activeModule, setActiveModule] = useState("pdf");
+  // Default module for students
+  const [activeModule, setActiveModule] = useState("profile");
 
   // Allow deep-linking to a dashboard module via navigation state
   useEffect(() => {
@@ -27,18 +26,14 @@ const Dashboard = () => {
     switch (activeModule) {
       case "profile":
         return <CV onEditProfile={() => setActiveModule("updateuser")} />;
-      case "pdf":
-        return <PdfManager />; 
       case "finalreport":
         return <FinalReportPage />; 
       case "updateuser":
         return <UpdateUserPage />;
       case "jobs":
         return <StudentJobsPage />;
-      case "settings":
-        return <div>Nội dung Cài đặt sẽ ở đây...</div>; 
       default:
-        return <PdfManager />; 
+        return <CV onEditProfile={() => setActiveModule("updateuser")} />;
     }
   };
 

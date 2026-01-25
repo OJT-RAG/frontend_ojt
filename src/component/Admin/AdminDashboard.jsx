@@ -9,7 +9,6 @@ import UserManager from "./pages/UserManager";
 import CompanyManager from "./pages/CompanyManager";
 import JobManager from "./pages/JobManager";
 import DocumentManager from "./pages/DocumentManager";
-import Analytics from "./pages/Analytics";
 
 const AdminDashboard = () => {
   const [activeModule, setActiveModule] = useState("dashboard");
@@ -22,7 +21,6 @@ const AdminDashboard = () => {
       case "companies": return <CompanyManager />;
       case "jobs": return <JobManager />;
       case "documents": return <DocumentManager />;
-      case "analytics": return <Analytics />;
       default: return <DashboardOverview />;
     }
   };

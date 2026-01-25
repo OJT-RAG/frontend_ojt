@@ -6,8 +6,7 @@ import {
   Users, 
   Building2, 
   Briefcase, 
-  FileText, 
-  BarChart2 
+  FileText 
 } from "lucide-react";
 import "./AdminSidebar.scss";
 
@@ -20,7 +19,6 @@ const AdminSidebar = ({ activeModule, setActiveModule }) => {
     { id: "companies", label: t("admin_companies"), icon: <Building2 size={20} /> },
     { id: "jobs", label: t("admin_jobs"), icon: <Briefcase size={20} /> },
     { id: "documents", label: t("admin_documents"), icon: <FileText size={20} /> },
-    { id: "analytics", label: t("admin_analytics"), icon: <BarChart2 size={20} /> },
   ];
 
   return (

@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import jobApplicationApi from "../../API/JobApplicationAPI";
 import jobPositionApi from "../../API/JobPositionAPI";
+import jobDescriptionApi from "../../API/JobDescriptionAPI";
 import companySemesterApi from "../../API/CompanySemesterAPI";
 import userApi from "../../API/UserAPI";
 
@@ -53,6 +54,53 @@ export default function JobApplicationManage() {
   const [rejectReason, setRejectReason] = useState("");
   const [rejectingId, setRejectingId] = useState(null);
   const [jobTitleByJobPositionId, setJobTitleByJobPositionId] = useState({});
+  const [busyId, setBusyId] = useState(null);
+
+  const resolveJobDescriptionId = (d) =>
+    d?.jobDescriptionId ?? d?.jobDescriptionID ?? d?.jobDescriptionid ?? d?.id ?? d?.Id;
+
+  const resolveJobPositionIdFromDescription = (d) =>
+    d?.jobPositionId ?? d?.jobPositionID ?? d?.jobPositionid;
+
+  const loadJobDescriptionForPosition = async (jobPositionId) => {
+    const res = await jobDescriptionApi.getAll();
+    const list = res?.data?.data || [];
+    const record = list.find((d) => Number(resolveJobPositionIdFromDescription(d)) === Number(jobPositionId));
+    return record || null;
+  };
+
+  const upsertAppliedQuantity = async ({ jobPositionId, delta }) => {
+    if (!jobPositionId || !Number.isFinite(Number(jobPositionId))) return;
+
+    const record = await loadJobDescriptionForPosition(jobPositionId);
+
+    if (!record) {
+      console.warn("[Company Applicants] Missing job description for jobPositionId", jobPositionId);
+      return;
+    }
+
+    const id = resolveJobDescriptionId(record);
+    if (id == null) {
+      console.warn("[Company Applicants] Missing jobDescriptionId for jobPositionId", jobPositionId);
+      return;
+    }
+
+    const hireQuantity = Number(record?.hireQuantity ?? 0);
+    const appliedQuantity = Number(record?.appliedQuantity ?? 0);
+    const nextApplied = Math.max(0, appliedQuantity + Number(delta || 0));
+
+    if (hireQuantity > 0 && nextApplied > hireQuantity) {
+      throw new Error("Job position is full");
+    }
+
+    await jobDescriptionApi.update({
+      jobDescriptionId: id,
+      jobPositionId: Number(jobPositionId),
+      jobDescription: record?.jobDescription ?? record?.JobDescription ?? record?.description ?? record?.jobDesc ?? "",
+      hireQuantity,
+      appliedQuantity: nextApplied,
+    });
+  };
 
   const fetchApplications = async () => {
     try {
@@ -140,9 +188,29 @@ export default function JobApplicationManage() {
     return;
   }
 
+  if (busyId === app?.jobApplicationId) return;
+
   const newStatus = app.status === "accepted" ? "pending" : "accepted";
 
   try {
+    setBusyId(app.jobApplicationId);
+
+    // If accepting, make sure the job isn't full and we can track capacity.
+    if (newStatus === "accepted") {
+      const record = await loadJobDescriptionForPosition(app.jobPositionId);
+      if (!record) {
+        alert("Job Position này chưa có Job Description. Hãy tạo Job Description trước khi Accept.");
+        return;
+      }
+      const hireQuantity = Number(record?.hireQuantity ?? 0);
+      const appliedQuantity = Number(record?.appliedQuantity ?? 0);
+      const isFull = hireQuantity > 0 && appliedQuantity >= hireQuantity;
+      if (isFull) {
+        alert("Vị trí này đã đủ số lượng (full). Không thể accept thêm.");
+        return;
+      }
+    }
+
     // 1️⃣ Update trạng thái application
     await jobApplicationApi.updateStatus({
       jobApplicationId: app.jobApplicationId,
@@ -157,10 +225,32 @@ export default function JobApplicationManage() {
       });
     }
 
+    // 3️⃣ Sync appliedQuantity: +1 on accept, -1 on unaccept
+    const delta =
+      app.status !== "accepted" && newStatus === "accepted"
+        ? 1
+        : app.status === "accepted" && newStatus !== "accepted"
+          ? -1
+          : 0;
+
+    if (delta !== 0) {
+      try {
+        await upsertAppliedQuantity({ jobPositionId: app.jobPositionId, delta });
+      } catch (e) {
+        if (String(e?.message || "").toLowerCase().includes("full")) {
+          alert("Vị trí này đã đủ số lượng (full). Không thể accept thêm.");
+        } else {
+          console.error("Failed to update applied quantity", e);
+        }
+      }
+    }
+
     fetchApplications();
   } catch (err) {
     console.error("Update status failed", err);
     alert("Có lỗi xảy ra khi cập nhật");
+  } finally {
+    setBusyId(null);
   }
 };
 

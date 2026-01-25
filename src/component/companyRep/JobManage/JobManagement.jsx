@@ -27,6 +27,21 @@ const debugLog = (...args) => {
   console.log("[JobManagement]", ...args);
 };
 
+const sortByNumericIdAsc = (list, getId) => {
+  const arr = Array.isArray(list) ? [...list] : [];
+  arr.sort((a, b) => {
+    const aId = Number(getId(a));
+    const bId = Number(getId(b));
+    const aOk = Number.isFinite(aId);
+    const bOk = Number.isFinite(bId);
+    if (aOk && bOk) return aId - bId;
+    if (aOk) return -1;
+    if (bOk) return 1;
+    return 0;
+  });
+  return arr;
+};
+
 const JobManagement = ({ variant = "company" }) => {
   const [jobs, setJobs] = useState([]);
   const [filtered, setFiltered] = useState([]);
@@ -46,10 +61,13 @@ const JobManagement = ({ variant = "company" }) => {
   const [semesterCompanies, setSemesterCompanies] = useState([]);
   const [companies, setCompanies] = useState([]);
 
-  const showTabs = variant === "admin";
-  const positionsReadOnly = variant === "admin";
-  const titlesReadOnly = variant === "admin";
-  const descriptionsReadOnly = variant === "admin";
+  const isAdmin = variant === "admin";
+  const showTabs = isAdmin;
+  // Admin should be able to manage job positions & descriptions.
+  // Keep job titles read-only unless explicitly enabled.
+  const positionsReadOnly = false;
+  const titlesReadOnly = isAdmin;
+  const descriptionsReadOnly = false;
 
   const [activeTab, setActiveTab] = useState("positions");
 
@@ -71,6 +89,7 @@ const JobManagement = ({ variant = "company" }) => {
   const [descLoading, setDescLoading] = useState(false);
   const [descEditJob, setDescEditJob] = useState(null);
   const [descExistingRecord, setDescExistingRecord] = useState(null);
+  const [descMode, setDescMode] = useState("create");
   const [descForm] = Form.useForm();
 
   // Description view-only modal (from Job Positions table)
@@ -139,15 +158,17 @@ const JobManagement = ({ variant = "company" }) => {
   };
 
   const getSemesterCompanyOptions = (semesterId) => {
-    const companyId = getCompanyIdFromStorage();
+    const companyId = isAdmin ? null : getCompanyIdFromStorage();
 
     const filtered = semesterCompanies.filter((sc) => {
       const scSemesterId = resolveSemesterId(sc);
       const scCompanyId = resolveCompanyId(sc);
       const matchSemester = semesterId ? scSemesterId === semesterId : true;
       const matchCompany = companyId ? scCompanyId === companyId : true;
+      // Company users can only act on approved semester-company pairs.
+      // Admin can see/manage all (approved or not).
       const approved = isApprovedSemesterCompany(sc);
-      return matchSemester && matchCompany && approved;
+      return matchSemester && matchCompany && (isAdmin ? true : approved);
     });
 
     return filtered;
@@ -186,6 +207,7 @@ const JobManagement = ({ variant = "company" }) => {
   }, [semesters]);
 
   const canManageJobPositionsForActiveSemester = useMemo(() => {
+    if (isAdmin) return true;
     const companyId = getCompanyIdFromStorage();
     if (!companyId || !activeSemesterId) return false;
     const ok = semesterCompanies.some((sc) => {
@@ -202,17 +224,19 @@ const JobManagement = ({ variant = "company" }) => {
       setPositionsLoading(true);
       const res = await jobPositionApi.getAll();
       const list = res.data?.data || [];
-      setJobPositionsRaw(list);
+      const rawSorted = sortByNumericIdAsc(list, (jp) => jp?.jobPositionId ?? jp?.jobPositionID ?? jp?.jobPositionid);
+      setJobPositionsRaw(rawSorted);
       const companyId = variant === "admin" ? null : getCompanyIdFromStorage();
-      const visible = filterJobPositionsForCompany(list, semesterCompanies, companyId);
+      const visible = filterJobPositionsForCompany(rawSorted, semesterCompanies, companyId);
+      const visibleSorted = sortByNumericIdAsc(visible, (jp) => jp?.jobPositionId ?? jp?.jobPositionID ?? jp?.jobPositionid);
       debugLog("fetchJobPositions()", {
         total: list.length,
-        visible: visible.length,
+        visible: visibleSorted.length,
         companyId,
         variant,
       });
-      setJobPositions(visible);
-      setFilteredPositions(visible);
+      setJobPositions(visibleSorted);
+      setFilteredPositions(visibleSorted);
     } catch (err) {
       console.error("Failed to fetch job positions:", err);
     } finally {
@@ -224,14 +248,15 @@ const JobManagement = ({ variant = "company" }) => {
     if (!jobPositionsRaw.length) return;
     const companyId = variant === "admin" ? null : getCompanyIdFromStorage();
     const visible = filterJobPositionsForCompany(jobPositionsRaw, semesterCompanies, companyId);
+    const visibleSorted = sortByNumericIdAsc(visible, (jp) => jp?.jobPositionId ?? jp?.jobPositionID ?? jp?.jobPositionid);
     debugLog("re-filter jobPositionsRaw after semesterCompanies change", {
       raw: jobPositionsRaw.length,
-      visible: visible.length,
+      visible: visibleSorted.length,
       companyId,
       variant,
     });
-    setJobPositions(visible);
-    setFilteredPositions(visible);
+    setJobPositions(visibleSorted);
+    setFilteredPositions(visibleSorted);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [semesterCompanies, variant]);
 
@@ -241,14 +266,42 @@ const JobManagement = ({ variant = "company" }) => {
       const res = await jobDescriptionApi.getAll();
       const list = res.data?.data || [];
 
-      setJobDescriptions(list);
-      setFilteredDescriptions(list);
+      const sorted = sortByNumericIdAsc(
+        list,
+        (d) => d?.jobDescriptionId ?? d?.jobDescriptionID ?? d?.jobDescriptionid ?? d?.id ?? d?.Id
+      );
+
+      setJobDescriptions(sorted);
+      setFilteredDescriptions(sorted);
 
       const map = {};
+      let duplicateCount = 0;
       for (const item of list) {
         const jobPositionId = item.jobPositionId ?? item.jobPositionID ?? item.jobPositionid;
         const text = resolveJobDescriptionText(item);
-        if (jobPositionId != null) map[jobPositionId] = { ...item, _text: text };
+        if (jobPositionId == null) continue;
+
+        const incomingId = Number(
+          item?.jobDescriptionId ?? item?.jobDescriptionID ?? item?.jobDescriptionid ?? item?.id ?? item?.Id
+        );
+
+        const existing = map[jobPositionId];
+        if (existing) {
+          duplicateCount += 1;
+          const existingId = Number(
+            existing?.jobDescriptionId ?? existing?.jobDescriptionID ?? existing?.jobDescriptionid ?? existing?.id ?? existing?.Id
+          );
+          // Keep the record with the greatest numeric id (best-effort "latest").
+          if (Number.isFinite(incomingId) && Number.isFinite(existingId) && incomingId < existingId) {
+            continue;
+          }
+        }
+
+        map[jobPositionId] = { ...item, _text: text };
+      }
+
+      if (duplicateCount > 0) {
+        console.warn("[JobManagement] Duplicate job descriptions detected (same jobPositionId).", { duplicateCount });
       }
 
       setDescriptionsByJobPositionId(map);
@@ -265,8 +318,14 @@ const JobManagement = ({ variant = "company" }) => {
       setLoading(true);
       const jobRes = await jobApi.getAll();
       const list = jobRes.data?.data || [];
-      setJobs(list);
-      setFiltered(list);
+
+      const sorted = sortByNumericIdAsc(
+        list,
+        (j) => j?.jobTitleId ?? j?.jobTitleID ?? j?.jobTitleid ?? j?.id ?? j?.Id
+      );
+
+      setJobs(sorted);
+      setFiltered(sorted);
       fetchDescriptions();
     } catch (err) {
       console.error("Failed to fetch jobs:", err);
@@ -295,7 +354,9 @@ const JobManagement = ({ variant = "company" }) => {
     const result = jobs.filter((job) =>
       (job.jobTitle || "").toLowerCase().includes(keyword)
     );
-    setFiltered(result);
+    setFiltered(
+      sortByNumericIdAsc(result, (j) => j?.jobTitleId ?? j?.jobTitleID ?? j?.jobTitleid ?? j?.id ?? j?.Id)
+    );
   };
 
   const positionCountByJobTitle = useMemo(() => {
@@ -313,7 +374,9 @@ const JobManagement = ({ variant = "company" }) => {
     const result = jobPositions.filter((jp) =>
       (jp.jobTitle || "").toLowerCase().includes(keyword)
     );
-    setFilteredPositions(result);
+    setFilteredPositions(
+      sortByNumericIdAsc(result, (jp) => jp?.jobPositionId ?? jp?.jobPositionID ?? jp?.jobPositionid)
+    );
   };
 
   const jobTitleByPositionId = useMemo(() => {
@@ -334,7 +397,12 @@ const JobManagement = ({ variant = "company" }) => {
       const text = (d?.jobDescription ?? d?.description ?? d?.jobDesc ?? "").toLowerCase();
       return title.includes(keyword) || text.includes(keyword);
     });
-    setFilteredDescriptions(result);
+    setFilteredDescriptions(
+      sortByNumericIdAsc(
+        result,
+        (d) => d?.jobDescriptionId ?? d?.jobDescriptionID ?? d?.jobDescriptionid ?? d?.id ?? d?.Id
+      )
+    );
   };
 
   // -------------------------
@@ -383,7 +451,7 @@ const JobManagement = ({ variant = "company" }) => {
   };
 
   const openCreatePositionModal = () => {
-    if (!canManageJobPositionsForActiveSemester) {
+    if (!isAdmin && !canManageJobPositionsForActiveSemester) {
       messageApi.warning("Company chưa được duyệt vào học kỳ đang hoạt động. Hãy vào Semester Company để gửi yêu cầu và chờ duyệt.");
       debugLog("openCreatePositionModal blocked", { activeSemesterId });
       return;
@@ -420,7 +488,7 @@ const JobManagement = ({ variant = "company" }) => {
   const handleSubmitPosition = async () => {
     let payloadForDebug = null;
     try {
-      if (!canManageJobPositionsForActiveSemester) {
+      if (!isAdmin && !canManageJobPositionsForActiveSemester) {
         messageApi.error("Không thể tạo/cập nhật Job Position: company chưa được duyệt vào học kỳ đang hoạt động");
         debugLog("handleSubmitPosition blocked", { activeSemesterId });
         return;
@@ -460,16 +528,18 @@ const JobManagement = ({ variant = "company" }) => {
         return;
       }
 
-      const allowedSemesterCompanyIds = new Set(
-        getSemesterCompanyOptions(payload.semesterId).map((sc) => resolveSemesterCompanyId(sc))
-      );
-      if (!allowedSemesterCompanyIds.has(payload.semesterCompanyId)) {
-        messageApi.error("Semester Company chưa được duyệt hoặc không thuộc company hiện tại");
-        debugLog("semesterCompanyId not allowed", {
-          semesterCompanyId: payload.semesterCompanyId,
-          allowed: Array.from(allowedSemesterCompanyIds),
-        });
-        return;
+      if (!isAdmin) {
+        const allowedSemesterCompanyIds = new Set(
+          getSemesterCompanyOptions(payload.semesterId).map((sc) => resolveSemesterCompanyId(sc))
+        );
+        if (!allowedSemesterCompanyIds.has(payload.semesterCompanyId)) {
+          messageApi.error("Semester Company chưa được duyệt hoặc không thuộc company hiện tại");
+          debugLog("semesterCompanyId not allowed", {
+            semesterCompanyId: payload.semesterCompanyId,
+            allowed: Array.from(allowedSemesterCompanyIds),
+          });
+          return;
+        }
       }
 
       if (editPosition) {
@@ -576,6 +646,7 @@ const JobManagement = ({ variant = "company" }) => {
       return;
     }
     setIsDescModalOpen(true);
+    setDescMode("create");
     setDescEditJob(null);
     setDescExistingRecord(null);
     descForm.resetFields();
@@ -589,6 +660,7 @@ const JobManagement = ({ variant = "company" }) => {
     const jobPositionId = record?.jobPositionId ?? record?.jobPositionID ?? record?.jobPositionid;
     const text = resolveJobDescriptionText(record);
     setIsDescModalOpen(true);
+    setDescMode("edit");
     setDescEditJob({ jobTitle: jobTitleByPositionId[jobPositionId] || "-" });
     setDescExistingRecord(record);
     descForm.resetFields();
@@ -608,8 +680,8 @@ const JobManagement = ({ variant = "company" }) => {
       }
       setDescLoading(true);
       const values = await descForm.validateFields();
-      const existingRecord =
-        descExistingRecord || descriptionsByJobPositionId[values.jobPositionId] || null;
+      const existingFromMap = descriptionsByJobPositionId[values.jobPositionId] || null;
+      const existingRecord = descExistingRecord || existingFromMap;
 
       const existingId =
         existingRecord?.jobDescriptionId ??
@@ -620,11 +692,29 @@ const JobManagement = ({ variant = "company" }) => {
         existingRecord?.id ??
         existingRecord?.Id;
 
+      // Enforce 1 description per jobPositionId.
+      // In create mode, if one already exists, force user to use Update.
+      if (descMode === "create" && existingId != null) {
+        messageApi.warning("This job position already has a description. Please use Update instead of Create.");
+        return;
+      }
+
+      const hireQuantity = Number(values.hireQuantity ?? 0);
+      const existingAppliedQuantity = Number(existingRecord?.appliedQuantity ?? 0);
+
+      // appliedQuantity is system-managed (updated when a student is accepted).
+      // Do not allow manual changes from company/admin.
+      const appliedQuantity = existingAppliedQuantity;
+      if (appliedQuantity > hireQuantity) {
+        messageApi.error("Applied quantity must be less than or equal to hire quantity");
+        return;
+      }
+
       const payload = {
         jobPositionId: values.jobPositionId,
         jobDescription: values.jobDescription,
-        hireQuantity: values.hireQuantity,
-        appliedQuantity: values.appliedQuantity,
+        hireQuantity,
+        appliedQuantity,
       };
 
       // Backend behavior: update requires existing record; otherwise it returns 404.
@@ -1409,7 +1499,12 @@ const JobManagement = ({ variant = "company" }) => {
       <Modal
         title={descEditJob ? `Job Description: ${descEditJob.jobTitle}` : "Job Description"}
         open={isDescModalOpen}
-        onCancel={() => setIsDescModalOpen(false)}
+        onCancel={() => {
+          setIsDescModalOpen(false);
+          setDescEditJob(null);
+          setDescExistingRecord(null);
+          setDescMode("create");
+        }}
         onOk={handleSubmitDescription}
         okText="Save"
         confirmLoading={descLoading}
@@ -1423,6 +1518,7 @@ const JobManagement = ({ variant = "company" }) => {
           >
             <Select
               placeholder="Select job position"
+              disabled={descMode === "edit"}
               onChange={(jobPositionId) => {
                 const existing = descriptionsByJobPositionId[jobPositionId];
                 setDescExistingRecord(existing || null);
@@ -1432,10 +1528,16 @@ const JobManagement = ({ variant = "company" }) => {
                   appliedQuantity: existing?.appliedQuantity ?? 0,
                 });
               }}
-              options={jobPositions.map((jp) => ({
-                label: `${jp.jobTitle} (ID: ${jp.jobPositionId})`,
-                value: jp.jobPositionId,
-              }))}
+              options={jobPositions
+                .filter((jp) => {
+                  const id = jp?.jobPositionId ?? jp?.jobPositionID ?? jp?.jobPositionid;
+                  if (id == null) return false;
+                  return descMode === "create" ? !descriptionsByJobPositionId[id] : true;
+                })
+                .map((jp) => ({
+                  label: `${jp.jobTitle} (ID: ${jp.jobPositionId})`,
+                  value: jp.jobPositionId,
+                }))}
             />
           </Form.Item>
 
@@ -1458,9 +1560,27 @@ const JobManagement = ({ variant = "company" }) => {
           <Form.Item
             label="Applied Quantity"
             name="appliedQuantity"
-            rules={[{ required: true, message: "Please enter applied quantity" }]}
+            dependencies={["hireQuantity"]}
+            rules={[
+              { required: true, message: "Please enter applied quantity" },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  const hire = Number(getFieldValue("hireQuantity") ?? 0);
+                  const applied = Number(value ?? 0);
+                  if (!Number.isFinite(hire) || !Number.isFinite(applied)) {
+                    return Promise.reject(new Error("Invalid quantity"));
+                  }
+                  if (applied > hire) {
+                    return Promise.reject(
+                      new Error("Applied quantity must be less than or equal to hire quantity")
+                    );
+                  }
+                  return Promise.resolve();
+                },
+              }),
+            ]}
           >
-            <InputNumber min={0} style={{ width: "100%" }} />
+            <InputNumber min={0} style={{ width: "100%" }} disabled />
           </Form.Item>
         </Form>
       </Modal>

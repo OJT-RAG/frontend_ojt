@@ -1,5 +1,5 @@
 import React from "react";
-import { Settings, FileText } from "lucide-react"; 
+import { FileText } from "lucide-react"; 
 import "./Sidebar.css";
 import { useAuth } from "../../Hook/useAuth";
 
@@ -22,13 +22,6 @@ console.log("FULL USER FROM useAuth:", user);
         onClick={() => setActiveModule("profile")}
       >
         <FileText /> Hồ sơ
-      </button>
-
-      <button
-        className={`sidebar-btn ${activeModule === "pdf" ? "active" : ""}`}
-        onClick={() => setActiveModule("pdf")}
-      >
-        <FileText /> Quản lý PDF
       </button>
 
       <button
@@ -55,12 +48,6 @@ console.log("FULL USER FROM useAuth:", user);
         <FileText /> Công việc
       </button>
 
-      <button
-        className={`sidebar-btn ${activeModule === "settings" ? "active" : ""}`}
-        disabled
-      >
-        <Settings /> Cài đặt (Sắp ra mắt)
-      </button>
     </aside>
   );
 };
