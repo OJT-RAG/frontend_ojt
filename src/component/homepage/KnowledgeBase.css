@@ -86,22 +86,11 @@
 /* Categories */
 .kb-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 1.25rem;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); /* 🔥 GIÃN */
+  gap: 1.75rem;
   margin-bottom: 4rem;
 }
 
-@media (min-width: 768px) {
-  .kb-grid {
-    grid-template-columns: repeat(2, 1fr);
-  }
-}
-
-@media (min-width: 1024px) {
-  .kb-grid {
-    grid-template-columns: repeat(3, 1fr);
-  }
-}
 
 .kb-card {
   padding: 1.25rem;

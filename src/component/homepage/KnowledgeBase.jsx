@@ -168,29 +168,32 @@ const loadRecentUpdates = async () => {
 
         {/* Categories */}
         <div className="kb-grid">
-  {categoriesConfig.map((cat) => (
-    <Card
-      key={cat.key}
-      className="kb-card"
-      onClick={() => navigate(`/ojt?tag=${cat.key}`)}
-      style={{ cursor: "pointer" }}
-    >
-      <div className={`kb-cat ${cat.color}`}>
-        <cat.icon className="kb-icon" />
-      </div>
+  {categoriesConfig
+    .slice(1)   // 👈 CHỈ DÒNG NÀY
+    .map((cat) => (
+      <Card
+        key={cat.key}
+        className="kb-card"
+        onClick={() => navigate(`/ojt?tag=${cat.key}`)}
+        style={{ cursor: "pointer" }}
+      >
+        <div className={`kb-cat ${cat.color}`}>
+          <cat.icon className="kb-icon" />
+        </div>
 
-      <h3 className="kb-cat-title">{cat.title}</h3>
-      <p className="kb-cat-desc">{cat.description}</p>
+        <h3 className="kb-cat-title">{cat.title}</h3>
+        <p className="kb-cat-desc">{cat.description}</p>
 
-      <div className="kb-card-footer">
-        <Badge variant="outline" className="kb-count">
-          {categoryCounts[cat.key] ?? 0} {t("kb_items")}
-        </Badge>
-        <ArrowRight className="kb-arrow" />
-      </div>
-    </Card>
-  ))}
+        <div className="kb-card-footer">
+          <Badge variant="outline" className="kb-count">
+            {categoryCounts[cat.key] ?? 0} {t("kb_items")}
+          </Badge>
+          <ArrowRight className="kb-arrow" />
+        </div>
+      </Card>
+    ))}
 </div>
+
 
 
         {/* Recent Updates – FULL WIDTH */}

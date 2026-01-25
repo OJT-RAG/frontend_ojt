@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Document, Page, pdfjs } from 'react-pdf';
 import './OJT.scss';
 import { useSearchParams } from "react-router-dom";
+import companyDocumentApi from '../../API/CompanyDocumentAPI';
 
 import ojtDocumentApi from '../../API/OjtDocumentAPI';
 import semesterApi from '../../API/SemesterAPI';
@@ -29,6 +30,8 @@ export default function OJT() {
 	const [pdfObjectUrl, setPdfObjectUrl] = useState('');
 	const [embedUrl, setEmbedUrl] = useState('');
 	const [downloadUrlOverride, setDownloadUrlOverride] = useState('');
+	console.groupCollapsed('[OJT] LOAD DOCUMENTS');
+	console.log('tagType:', tagType);
 
 	const getDocId = (doc) => {
 		const extractFromObject = (obj) => {
@@ -194,22 +197,50 @@ export default function OJT() {
 				if (cancelled) return;
 				setActiveSemester(activeSem);
 
-				const res = tagType
-					? await ojtDocumentApi.getByTagType(tagType)
-					: await ojtDocumentApi.getAll();
+				let list = [];
 
-				const list = res?.data?.data || [];
+if (tagType === 'private') {
+  const res = await companyDocumentApi.getAll();
+  console.log('[API] companyDocumentApi.getAll()', res?.data);
+  list = res?.data?.data || res?.data || [];
+} 
+else {
+  const apiTagType = tagType === 'private' ? 'system' : tagType;
+  console.log('[API] ojtDocument tagType:', apiTagType ?? 'ALL');
+
+  const res = apiTagType
+    ? await ojtDocumentApi.getByTagType(apiTagType)
+    : await ojtDocumentApi.getAll();
+
+  console.log('[API] ojtDocument response:', res?.data);
+  list = res?.data?.data || [];
+}
+
+
 				const normalized = (Array.isArray(list) ? list : [])
-					.filter((d) => !!d?.isGeneral) // public OJT Docs only shows general documents
-					.map((d, idx) => ({
-						id: getDocId(d) ?? d?.fileUrl ?? `${idx}`,
-						title: d?.title || '(untitled)',
-						url: d?.fileUrl,
-						isGeneral: !!d?.isGeneral,
-						semesterId: getSemesterId(d),
-					}))
-					.filter((d) => !!d.url)
-					.filter((d) => String(d?.semesterId ?? '') === String(activeSemesterId));
+  .map((d) => {
+    const isCompanyDoc = !!d.companyDocumentId;
+
+    return {
+      id: isCompanyDoc ? d.companyDocumentId : getDocId(d),
+      title: d.title || '(untitled)',
+      url: d.fileUrl,
+      isGeneral: isCompanyDoc ? d.isPublic : !!d?.isGeneral,
+      semesterId: isCompanyDoc
+        ? d.semesterCompanyId
+        : getSemesterId(d),
+      source: isCompanyDoc ? 'company' : 'ojt',
+    };
+  })
+  .filter(d => {
+    // ✅ BÂY GIỜ source ĐÃ TỒN TẠI
+    if (d.source === 'ojt') return d.isGeneral === true;
+    if (d.source === 'company') return true;
+    return false;
+  })
+  .filter(d => !!d.url)
+  .filter(d => String(d.semesterId ?? '') === String(activeSemesterId));
+
 
 				normalized.sort((a, b) => {
 					const aNum = Number(a.id);
@@ -267,11 +298,12 @@ export default function OJT() {
   const tagFromUrl = searchParams.get("tag");
 
   // chỉ set nếu hợp lệ
-  if (["company", "university", "system"].includes(tagFromUrl)) {
-    setTagType(tagFromUrl);
-  } else {
-    setTagType(null); // getAll
-  }
+  if (["company", "university", "private"].includes(tagFromUrl)) {
+  setTagType(tagFromUrl);
+} else {
+  setTagType(null);
+}
+
 }, [searchParams]);
 
 	useEffect(() => {
@@ -562,13 +594,14 @@ export default function OJT() {
 </button>
 
 <button
-  className={tagType === 'system' ? 'active' : ''}
+  className={tagType === 'private' ? 'active' : ''}
   onClick={() =>
-    setTagType(prev => (prev === 'system' ? null : 'system'))
+    setTagType(prev => (prev === 'private' ? null : 'private'))
   }
 >
-  System
+  Private
 </button>
+
 
 </div>
 

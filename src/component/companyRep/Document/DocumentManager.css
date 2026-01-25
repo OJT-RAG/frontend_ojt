@@ -286,3 +286,119 @@
   background: #fff;
   box-shadow: 0 0 0 4px rgba(52, 152, 219, 0.15);
 }
+.action-group {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.delete-btn {
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  padding: 12px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.delete-btn:hover {
+  background: #c0392b;
+}
+
+.tag-btn {
+  background: #fff;
+  color: #3498db;
+  border: 1px dashed #3498db;
+  padding: 11px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.tag-btn:hover {
+  background: #ecf6ff;
+}
+.action-group {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.delete-btn {
+  background: #e74c3c;
+  color: #fff;
+  border: none;
+  padding: 12px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.delete-btn:hover {
+  background: #c0392b;
+}
+
+.tag-btn {
+  background: #fff;
+  color: #3498db;
+  border: 1px dashed #3498db;
+  padding: 11px 16px;
+  border-radius: 10px;
+  cursor: pointer;
+  font-size: 14px;
+}
+
+.tag-btn:hover {
+  background: #ecf6ff;
+}
+.tag-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: linear-gradient(135deg, #e6f4ff, #f0f9ff);
+  color: #1677ff;
+  padding: 6px 10px;
+  border-radius: 999px;
+  margin-right: 6px;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 500;
+  position: relative;
+}
+
+.tag-remove {
+  opacity: 0;
+  border: none;
+  background: transparent;
+  color: #ff4d4f;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  transition: opacity 0.2s ease;
+}
+
+.tag-pill:hover .tag-remove {
+  opacity: 1;
+}
+.access-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.access-badge.public {
+  background: #eafaf1;
+  color: #27ae60;
+  border: 1px solid #b7ebc6;
+}
+
+.access-badge.private {
+  background: #fdecea;
+  color: #e74c3c;
+  border: 1px solid #f5c6cb;
+}

@@ -53,7 +53,7 @@ export default function JobApplicationManage() {
   const [rejectReason, setRejectReason] = useState("");
   const [rejectingId, setRejectingId] = useState(null);
   const [jobTitleByJobPositionId, setJobTitleByJobPositionId] = useState({});
-
+  const [userById, setUserById] = useState({});
   const fetchApplications = async () => {
     try {
       const companyId = getCompanyIdFromStorage();
@@ -66,11 +66,26 @@ export default function JobApplicationManage() {
         return;
       }
 
-      const [appRes, jobPosRes, scRes] = await Promise.all([
-        jobApplicationApi.getAll(),
-        jobPositionApi.getAll(),
-        companySemesterApi.getByCompany(companyId).catch(() => ({ data: { data: [] } })),
-      ]);
+      const [appRes, jobPosRes, scRes, userRes] = await Promise.all([
+  jobApplicationApi.getAll(),
+  jobPositionApi.getAll(),
+  companySemesterApi.getByCompany(companyId).catch(() => ({ data: { data: [] } })),
+  userApi.getAll(),
+]);
+
+const users = userRes?.data?.data || [];
+
+const userMap = {};
+for (const u of users) {
+  if (u.userId != null) {
+    userMap[u.userId] = {
+      fullname: u.fullname || u.email || "Unknown",
+      cvUrl: u.cvUrl || null,
+    };
+  }
+}
+
+setUserById(userMap);
 
       const apps = appRes?.data?.data || [];
       const jobPositions = jobPosRes?.data?.data || [];
@@ -193,9 +208,9 @@ export default function JobApplicationManage() {
       <table>
         <thead>
           <tr>
-            <th>ID</th>
-            <th>User ID</th>
+            <th>User Name</th>
             <th>Job Position</th>
+            <th>CV</th>
             <th>Status</th>
             <th>Applied At</th>
             <th>Action</th>
@@ -205,14 +220,30 @@ export default function JobApplicationManage() {
         <tbody>
           {applications.map((app) => (
             <tr key={app.jobApplicationId}>
-              <td>{app.jobApplicationId}</td>
-              <td>{app.userId}</td>
+              
+              <td>
+  {userById[app.userId]?.fullname || "Không xác định"}
+</td>
               <td>
                 {app.jobPositionId}
                 {jobTitleByJobPositionId[app.jobPositionId]
                   ? ` - ${jobTitleByJobPositionId[app.jobPositionId]}`
                   : ""}
               </td>
+              <td>
+  {userById[app.userId]?.cvUrl ? (
+    <a
+      href={userById[app.userId].cvUrl}
+      target="_blank"
+      rel="noopener noreferrer"
+    >
+      Xem CV
+    </a>
+  ) : (
+    <span className="no-cv">Không có</span>
+  )}
+</td>
+
               <td className={`status ${app.status}`}>{app.status}</td>
               <td>{new Date(app.appliedAt).toLocaleString()}</td>
 
